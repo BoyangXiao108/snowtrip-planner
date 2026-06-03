@@ -31,14 +31,11 @@ export function PlannerForm({
   onTerrainWeightChange: (preference: Preference, value: string) => void;
 }) {
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-[1.5rem] border border-white/80 bg-white/80 p-5 shadow-sm shadow-slate-200/70 backdrop-blur sm:p-6"
-    >
+    <form onSubmit={onSubmit}>
       <div className="space-y-6">
         <div>
-          <p className="text-lg font-semibold tracking-tight text-slate-950">
-            Structured Search
+          <p className="text-base font-semibold tracking-tight text-slate-950">
+            Exact inputs
           </p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
             Prefer exact inputs? Tune the same recommendation engine manually.
@@ -61,7 +58,7 @@ export function PlannerForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-2xl border border-teal-700 bg-white px-4 py-3 font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
+          className="w-full rounded-2xl border border-teal-700 bg-white px-4 py-3 font-semibold text-teal-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
         >
           {isLoading ? "Building your trip advice..." : "Search with structured inputs"}
         </button>

@@ -1,10 +1,9 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, ReactNode, useState } from "react";
 
 import { AdvisorSummary } from "../components/AdvisorSummary";
 import { NaturalSearchPanel } from "../components/NaturalSearchPanel";
-import { ParsedRequestPanel } from "../components/ParsedRequestPanel";
 import { PlannerForm } from "../components/PlannerForm";
 import { RecommendationCard } from "../components/RecommendationCard";
 import { RetrievalDebugPanel } from "../components/RetrievalDebugPanel";
@@ -20,7 +19,6 @@ import type {
   Preference,
   Recommendation,
   RetrievalDebug,
-  StructuredRequest,
   TerrainWeights,
 } from "../types";
 
@@ -35,11 +33,11 @@ export default function Home() {
   const [naturalLanguageMessage, setNaturalLanguageMessage] = useState(
     DEFAULT_NATURAL_LANGUAGE_MESSAGE,
   );
-  const [parsedRequest, setParsedRequest] = useState<StructuredRequest | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [advisorSummary, setAdvisorSummary] = useState<string | null>(null);
   const [retrievalDebug, setRetrievalDebug] = useState<RetrievalDebug | null>(null);
   const [showRetrievalDetails, setShowRetrievalDetails] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -66,10 +64,10 @@ export default function Home() {
   }
 
   async function submitRequest(requestType: "natural" | "structured") {
+    setHasSearched(true);
     setIsLoading(true);
     setError(null);
     setAdvisorSummary(null);
-    setParsedRequest(null);
     setRetrievalDebug(null);
     setShowRetrievalDetails(false);
 
@@ -92,14 +90,12 @@ export default function Home() {
       const data = (await response.json()) as AdvisorResponse | ParsedAdvisorResponse;
       setRecommendations(data.recommendations);
       setAdvisorSummary(data.advisor_summary?.trim() || null);
-      setParsedRequest("parsed_request" in data ? data.parsed_request : null);
       setRetrievalDebug(
         "retrieval_debug" in data ? data.retrieval_debug ?? null : null,
       );
     } catch (error) {
       setRecommendations([]);
       setAdvisorSummary(null);
-      setParsedRequest(null);
       setRetrievalDebug(null);
       setShowRetrievalDetails(false);
       setError(error instanceof Error ? error.message : "Something went wrong.");
@@ -132,22 +128,22 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#dfeeed,transparent_34%),linear-gradient(180deg,#f8fbfb_0%,#eef4f3_100%)] px-4 py-10 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[#f7faf9] px-4 py-12 sm:px-6 sm:py-16 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mx-auto max-w-4xl text-center">
+        <header className="mx-auto max-w-5xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
             Snowtrip Planner
           </p>
-          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 sm:text-6xl">
-            Plan a better ski trip in one sentence.
+          <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 sm:text-6xl lg:text-7xl">
+            Find the right mountain for your next ski trip.
           </h1>
-          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
+          <p className="mx-auto mt-5 max-w-3xl text-lg leading-8 text-slate-600">
             Plan a ski trip using your pass, budget, terrain preferences, weather,
             and resort knowledge.
           </p>
         </header>
 
-        <section className="mt-10">
+        <section className="mt-12">
           <NaturalSearchPanel
             error={error}
             isLoading={isLoading}
@@ -157,20 +153,31 @@ export default function Home() {
           />
         </section>
 
-        <section aria-live="polite" className="mt-10">
-          {recommendations.length === 0 && !error ? <EmptyState /> : null}
+        {!hasSearched && recommendations.length === 0 ? <EmptyState /> : null}
 
-          {recommendations.length > 0 ? (
-            <div className="space-y-6">
+        {recommendations.length > 0 ? (
+          <section aria-live="polite" className="mt-16 space-y-12">
+            <div>
               <AdvisorSummary summary={advisorSummary} />
+            </div>
 
-              {parsedRequest ? (
-                <div className="mx-auto max-w-5xl">
-                  <ParsedRequestPanel parsedRequest={parsedRequest} />
+            <section>
+              <div className="mb-6 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
+                    Resort recommendations
+                  </p>
+                  <h2 className="mt-1 text-3xl font-semibold tracking-tight text-slate-950">
+                    Ranked for this trip
+                  </h2>
                 </div>
-              ) : null}
+                <p className="max-w-xl text-sm leading-6 text-slate-500">
+                  Score blends terrain fit, pass value, budget, travel time, and
+                  available snow forecast data.
+                </p>
+              </div>
 
-              <div className="grid gap-5 lg:grid-cols-3">
+              <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {recommendations.map((recommendation, index) => (
                   <RecommendationCard
                     key={`${recommendation.name}-${recommendation.state}`}
@@ -179,22 +186,11 @@ export default function Home() {
                   />
                 ))}
               </div>
+            </section>
+          </section>
+        ) : null}
 
-              {retrievalDebug ? (
-                <RetrievalDebugPanel
-                  isVisible={showRetrievalDetails}
-                  retrievalDebug={retrievalDebug}
-                  onToggle={() =>
-                    setShowRetrievalDetails((currentValue) => !currentValue)
-                  }
-                />
-              ) : null}
-            </div>
-          ) : null}
-        </section>
-
-        <section className="mt-10 grid gap-6 lg:grid-cols-[1fr_minmax(360px,460px)_1fr]">
-          <div className="hidden lg:block" />
+        <AdvancedStructuredSearch>
           <PlannerForm
             budget={budget}
             days={days}
@@ -209,8 +205,19 @@ export default function Home() {
             onSubmit={handleStructuredSubmit}
             onTerrainWeightChange={updateTerrainWeight}
           />
-          <div className="hidden lg:block" />
-        </section>
+        </AdvancedStructuredSearch>
+
+        {retrievalDebug ? (
+          <section className="mt-10">
+            <RetrievalDebugPanel
+              isVisible={showRetrievalDetails}
+              retrievalDebug={retrievalDebug}
+              onToggle={() =>
+                setShowRetrievalDetails((currentValue) => !currentValue)
+              }
+            />
+          </section>
+        ) : null}
       </div>
     </main>
   );
@@ -218,16 +225,32 @@ export default function Home() {
 
 function EmptyState() {
   return (
-    <div className="mx-auto max-w-4xl rounded-[1.5rem] border border-dashed border-slate-300 bg-white/50 p-8 text-center">
-      <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-        Your trip plan will appear here.
-      </h2>
-      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-        Describe where you are leaving from, how long you are going, your budget,
-        your pass, and what kind of terrain you want. Your trip advice and ranked
-        recommendations will appear here.
-      </p>
-    </div>
+    <p className="mx-auto mt-8 max-w-xl text-center text-sm leading-6 text-slate-500">
+      Describe your trip above to receive personalized recommendations.
+    </p>
+  );
+}
+
+function AdvancedStructuredSearch({ children }: { children: ReactNode }) {
+  return (
+    <section className="mx-auto mt-16 max-w-4xl">
+      <details className="group rounded-[1.5rem] border border-slate-200 bg-white/85 shadow-sm shadow-slate-200/70 backdrop-blur">
+        <summary className="flex cursor-pointer list-none items-center justify-between gap-5 p-5 marker:hidden sm:p-6">
+          <div>
+            <p className="text-lg font-semibold tracking-tight text-slate-950">
+              Advanced Structured Search
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-500">
+              Use exact inputs and terrain weights when you want tighter control.
+            </p>
+          </div>
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-slate-200 text-xl text-slate-500 transition group-open:rotate-45">
+            +
+          </span>
+        </summary>
+        <div className="border-t border-slate-100 p-5 sm:p-6">{children}</div>
+      </details>
+    </section>
   );
 }
 
