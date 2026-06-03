@@ -7,6 +7,25 @@ from schemas import ResortRecommendation
 
 
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
+ADVISOR_MAX_OUTPUT_TOKENS = 500
+INCOMPLETE_ENDINGS = (
+    " because",
+    " due to",
+    " with",
+    " for",
+    " and",
+    " or",
+    " but",
+    " so",
+    " by",
+    " to",
+    " based on",
+    " compared with",
+    " against",
+    " a",
+    " an",
+    " the",
+)
 
 
 def generate_advisor_summary(
@@ -99,13 +118,20 @@ def _call_openai_advisor(
 ) -> str:
     prompt = (
         "You are a ski trip advisor. Using only the recommendation data below, "
-        "write a concise trip summary. Recommend the best option, explain key "
+        "write a concise trip summary under 160 words. Recommend the best option, explain key "
         "tradeoffs, and mention budget, terrain fit, travel distance, and snow "
-        "forecast when available. Do not add facts that are not in the data.\n\n"
+        "forecast when available. Finish with a complete sentence. "
+        "Do not add facts that are not in the data.\n\n"
         f"{build_advisor_context(recommendations, user_message)}"
     )
+    summary = call_openai_responses(
+        api_key,
+        model,
+        prompt,
+        max_tokens=ADVISOR_MAX_OUTPUT_TOKENS,
+    )
 
-    return call_openai_responses(api_key, model, prompt, max_tokens=220)
+    return _ensure_complete_summary(summary)
 
 
 def _alternative_summary(recommendations: list[ResortRecommendation]) -> str:
@@ -159,3 +185,30 @@ def _knowledge_note(
     readable_field = field.replace("_", " ")
 
     return f"Useful note: {readable_field}: {resort_knowledge[field]} "
+
+
+def _ensure_complete_summary(summary: str) -> str:
+    cleaned_summary = " ".join(summary.strip().split())
+
+    if not cleaned_summary:
+        return "The top-ranked resort is the best choice based on the calculated recommendation data."
+
+    if _appears_truncated(cleaned_summary):
+        return (
+            f"{cleaned_summary.rstrip(' ,;:-')}. "
+            "Overall, choose the top-ranked resort based on the calculated recommendation data."
+        )
+
+    if cleaned_summary[-1] not in ".!?":
+        return f"{cleaned_summary}."
+
+    return cleaned_summary
+
+
+def _appears_truncated(summary: str) -> bool:
+    lowered_summary = summary.casefold().rstrip()
+
+    if lowered_summary[-1] in ",;:-":
+        return True
+
+    return any(lowered_summary.endswith(ending) for ending in INCOMPLETE_ENDINGS)

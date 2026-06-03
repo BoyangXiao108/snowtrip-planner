@@ -412,6 +412,30 @@ def test_advisor_does_not_call_openai_without_api_key(
     assert response.status_code == 200
 
 
+def test_openai_advisor_summary_does_not_end_with_incomplete_phrase(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        assert max_tokens == advisor_summary.ADVISOR_MAX_OUTPUT_TOKENS
+        return "Best pick: Stowe because"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert not summary.endswith("because")
+    assert summary.endswith(".")
+    assert "Overall, choose the top-ranked resort" in summary
+
+
 def test_knowledge_file_loads() -> None:
     resort_knowledge = knowledge.load_resort_knowledge()
 
