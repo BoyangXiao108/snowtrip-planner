@@ -120,6 +120,8 @@ npm run dev
 
 The frontend will run at `http://localhost:3000`.
 
+The frontend submits the planner form to `POST /advisor`, displays the returned `advisor_summary`, and then renders the ranked recommendation cards.
+
 ## Test With curl
 
 ```bash

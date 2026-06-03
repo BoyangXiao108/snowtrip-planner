@@ -25,8 +25,9 @@ type Recommendation = {
   weather: Weather | null;
 };
 
-type RecommendResponse = {
+type AdvisorResponse = {
   recommendations: Recommendation[];
+  advisor_summary?: string | null;
 };
 
 type TerrainWeights = Record<Preference, number>;
@@ -55,6 +56,7 @@ export default function Home() {
     DEFAULT_TERRAIN_WEIGHTS,
   );
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [advisorSummary, setAdvisorSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -62,6 +64,7 @@ export default function Home() {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+    setAdvisorSummary(null);
 
     if (!Object.values(terrainWeights).some((weight) => weight > 0)) {
       setIsLoading(false);
@@ -70,7 +73,7 @@ export default function Home() {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/recommend`, {
+      const response = await fetch(`${API_BASE_URL}/advisor`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -88,10 +91,12 @@ export default function Home() {
         throw new Error("Unable to get recommendations. Check your inputs and try again.");
       }
 
-      const data = (await response.json()) as RecommendResponse;
+      const data = (await response.json()) as AdvisorResponse;
       setRecommendations(data.recommendations);
+      setAdvisorSummary(data.advisor_summary?.trim() || null);
     } catch (error) {
       setRecommendations([]);
+      setAdvisorSummary(null);
       setError(error instanceof Error ? error.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
@@ -225,8 +230,13 @@ export default function Home() {
                 disabled={isLoading}
                 className="w-full rounded-md bg-teal-700 px-4 py-2.5 font-semibold text-white shadow-sm transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
               >
-                {isLoading ? "Finding resorts..." : "Recommend"}
+                {isLoading ? "Building your trip advice..." : "Recommend"}
               </button>
+              {isLoading ? (
+                <p className="text-center text-sm text-slate-600">
+                  Building your trip advice...
+                </p>
+              ) : null}
             </div>
           </form>
 
@@ -250,6 +260,10 @@ export default function Home() {
               </div>
             ) : null}
 
+            {recommendations.length > 0 ? (
+              <AdvisorSummary summary={advisorSummary} />
+            ) : null}
+
             <div className="grid gap-4">
               {recommendations.map((recommendation, index) => (
                 <RecommendationCard
@@ -263,6 +277,18 @@ export default function Home() {
         </section>
       </div>
     </main>
+  );
+}
+
+function AdvisorSummary({ summary }: { summary: string | null }) {
+  return (
+    <section className="mb-4 rounded-lg border border-teal-100 bg-teal-50 p-5 shadow-sm">
+      <h2 className="text-lg font-semibold text-teal-950">Trip advice</h2>
+      <p className="mt-2 text-sm leading-6 text-teal-950">
+        {summary ??
+          "Advisor summary is unavailable, but your ranked resort recommendations are ready below."}
+      </p>
+    </section>
   );
 }
 
