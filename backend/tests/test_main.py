@@ -406,3 +406,93 @@ def test_advisor_does_not_call_openai_without_api_key(
     response = client.post("/advisor", json=VALID_REQUEST)
 
     assert response.status_code == 200
+
+
+def test_advisor_parse_epic_boston_days_budget_trees_powder(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": (
+                "I have Epic Pass, leaving from Boston for 3 days, budget $1000, "
+                "I like trees and powder."
+            )
+        },
+    )
+    parsed_request = response.json()["parsed_request"]
+
+    assert response.status_code == 200
+    assert parsed_request == {
+        "origin": "Boston",
+        "days": 3,
+        "budget": 1000,
+        "pass_type": "Epic",
+        "terrain_weights": {
+            "trees": 5,
+            "powder": 4,
+            "groomers": 0,
+            "park": 0,
+        },
+    }
+    assert len(response.json()["recommendations"]) == 3
+    assert response.json()["advisor_summary"]
+
+
+def test_advisor_parse_ikon_and_park(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={"message": "Ikon trip, mostly park with jumps and rails."},
+    )
+    parsed_request = response.json()["parsed_request"]
+
+    assert response.status_code == 200
+    assert parsed_request["pass_type"] == "Ikon"
+    assert parsed_request["terrain_weights"]["park"] == 5
+
+
+def test_advisor_parse_missing_fields_use_defaults(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={"message": "I want a simple ski trip."},
+    )
+    parsed_request = response.json()["parsed_request"]
+
+    assert response.status_code == 200
+    assert parsed_request == {
+        "origin": "Boston",
+        "days": 3,
+        "budget": 1000,
+        "pass_type": "None",
+        "terrain_weights": {
+            "trees": 5,
+            "powder": 0,
+            "groomers": 0,
+            "park": 0,
+        },
+    }
+
+
+def test_advisor_parse_does_not_call_openai_without_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(api_key: str, model: str, message: str):
+        raise AssertionError("OpenAI parser should not be called without OPENAI_API_KEY")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(ai_advisor, "_call_openai_parser", fail_if_called)
+
+    response = client.post(
+        "/advisor/parse",
+        json={"message": "Epic pass from Boston for 3 days, budget $1000, trees."},
+    )
+
+    assert response.status_code == 200

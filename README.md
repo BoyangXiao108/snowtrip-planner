@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V6.1 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, and an optional AI trip advisor summary.
+Backend V6.3 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, and natural-language trip parsing.
 
 ## Project Structure
 
@@ -58,6 +58,20 @@ export OPENAI_MODEL="gpt-4.1-mini"
 ```
 
 `OPENAI_MODEL` is optional and defaults to `gpt-4.1-mini`.
+
+## Natural-Language Advisor Parse
+
+`POST /advisor/parse` accepts a plain-language trip request, converts it into the structured advisor request, and returns the parsed request, recommendations, and advisor summary.
+
+```bash
+curl -X POST http://127.0.0.1:8000/advisor/parse \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "I have Epic Pass, leaving from Boston for 3 days, budget $1000, I like trees and powder."
+  }'
+```
+
+Without `OPENAI_API_KEY`, parsing uses deterministic keyword rules and safe defaults. With `OPENAI_API_KEY`, the backend can use OpenAI to parse the message, then falls back locally if the call fails.
 
 ## Weather
 

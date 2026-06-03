@@ -60,6 +60,16 @@ class AdvisorResponse(BaseModel):
     advisor_summary: str
 
 
+class AdvisorParseRequest(BaseModel):
+    message: str = Field(..., min_length=1)
+
+
+class AdvisorParseResponse(BaseModel):
+    parsed_request: RecommendRequest
+    recommendations: list[ResortRecommendation]
+    advisor_summary: str
+
+
 class ResortWeatherResponse(BaseModel):
     resort_name: str
     weather: WeatherForecast | None
