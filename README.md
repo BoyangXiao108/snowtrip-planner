@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V5.2 for a simple ski resort recommendation API with weighted terrain scoring and snow condition scoring.
+Backend V6.1 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, and an optional AI trip advisor summary.
 
 ## Project Structure
 
@@ -28,6 +28,36 @@ uvicorn main:app --reload
 ```
 
 The API will run at `http://127.0.0.1:8000`.
+
+## AI Trip Advisor
+
+`POST /advisor` accepts the same request body as `POST /recommend` and returns recommendations plus an `advisor_summary`.
+
+```bash
+curl -X POST http://127.0.0.1:8000/advisor \
+  -H "Content-Type: application/json" \
+  -d '{
+    "origin": "Boston",
+    "days": 3,
+    "budget": 1000,
+    "pass_type": "Epic",
+    "terrain_weights": {
+      "trees": 5,
+      "powder": 4,
+      "groomers": 2,
+      "park": 0
+    }
+  }'
+```
+
+OpenAI is optional. Without `OPENAI_API_KEY`, the backend returns a deterministic local advisor summary. To enable AI-generated summaries:
+
+```bash
+export OPENAI_API_KEY="your-api-key"
+export OPENAI_MODEL="gpt-4.1-mini"
+```
+
+`OPENAI_MODEL` is optional and defaults to `gpt-4.1-mini`.
 
 ## Weather
 

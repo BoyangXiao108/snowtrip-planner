@@ -55,6 +55,11 @@ class RecommendResponse(BaseModel):
     recommendations: list[ResortRecommendation]
 
 
+class AdvisorResponse(BaseModel):
+    recommendations: list[ResortRecommendation]
+    advisor_summary: str
+
+
 class ResortWeatherResponse(BaseModel):
     resort_name: str
     weather: WeatherForecast | None

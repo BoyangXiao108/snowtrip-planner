@@ -2,6 +2,7 @@ from fastapi.testclient import TestClient
 import json
 import pytest
 
+import ai_advisor
 import weather
 from main import app
 
@@ -356,3 +357,52 @@ def test_weather_expired_cache_refetches(monkeypatch: pytest.MonkeyPatch) -> Non
 
     assert call_count == 2
     assert second_forecast["temperature_f"] != first_forecast["temperature_f"]
+
+
+def test_advisor_works_without_openai_api_key(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert response.status_code == 200
+
+
+def test_advisor_returns_recommendations(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert len(response.json()["recommendations"]) == 3
+
+
+def test_advisor_returns_advisor_summary(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert response.json()["advisor_summary"]
+
+
+def test_advisor_fallback_summary_is_deterministic(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    first_response = client.post("/advisor", json=VALID_REQUEST)
+    second_response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert first_response.json()["advisor_summary"] == second_response.json()["advisor_summary"]
+
+
+def test_advisor_does_not_call_openai_without_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(api_key: str, model: str, recommendations: list) -> str:
+        raise AssertionError("OpenAI API should not be called without OPENAI_API_KEY")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(ai_advisor, "_call_openai_advisor", fail_if_called)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert response.status_code == 200
