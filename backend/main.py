@@ -2,6 +2,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from ai_advisor import generate_advisor_summary, parse_trip_message
+import embedding_retriever
 import weather
 from resorts import find_resort_by_name, recommend_resorts
 from schemas import (
@@ -14,7 +15,7 @@ from schemas import (
 )
 
 
-app = FastAPI(title="Snowtrip Planner API", version="6.8.0")
+app = FastAPI(title="Snowtrip Planner API", version="6.9.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -51,16 +52,28 @@ def advisor(request: RecommendRequest) -> AdvisorResponse:
     )
 
 
-@app.post("/advisor/parse", response_model=AdvisorParseResponse)
+@app.post(
+    "/advisor/parse",
+    response_model=AdvisorParseResponse,
+    response_model_exclude_none=True,
+)
 def advisor_parse(request: AdvisorParseRequest) -> AdvisorParseResponse:
     parsed_request = parse_trip_message(request.message)
     recommendations = recommend_resorts(parsed_request)
     advisor_summary = generate_advisor_summary(recommendations, request.message)
+    retrieval_debug = None
+
+    if request.debug:
+        _, retrieval_debug = embedding_retriever.retrieve_embedding_context_with_debug(
+            request.message,
+            recommendations,
+        )
 
     return AdvisorParseResponse(
         parsed_request=parsed_request,
         recommendations=recommendations,
         advisor_summary=advisor_summary,
+        retrieval_debug=retrieval_debug,
     )
 
 

@@ -62,12 +62,28 @@ class AdvisorResponse(BaseModel):
 
 class AdvisorParseRequest(BaseModel):
     message: str = Field(..., min_length=1)
+    debug: bool = False
+
+
+class RetrievedChunkDebug(BaseModel):
+    resort_name: str
+    score: float | None
+    source: str
+    text_preview: str
+
+
+class RetrievalDebug(BaseModel):
+    mode: Literal["embedding", "keyword_fallback"]
+    query: str
+    top_k: int
+    retrieved_chunks: list[RetrievedChunkDebug]
 
 
 class AdvisorParseResponse(BaseModel):
     parsed_request: RecommendRequest
     recommendations: list[ResortRecommendation]
     advisor_summary: str
+    retrieval_debug: RetrievalDebug | None = None
 
 
 class ResortWeatherResponse(BaseModel):

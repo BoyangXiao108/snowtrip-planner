@@ -488,6 +488,95 @@ def test_advisor_parse_includes_query_aware_knowledge_context(
     assert "Useful note: lodging notes:" in advisor_summary_text
 
 
+def test_advisor_parse_debug_false_excludes_retrieval_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": "Epic pass from Boston for 3 days, budget $1000, trees.",
+            "debug": False,
+        },
+    )
+
+    assert response.status_code == 200
+    assert "retrieval_debug" not in response.json()
+
+
+def test_advisor_parse_debug_omitted_excludes_retrieval_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={"message": "Epic pass from Boston for 3 days, budget $1000, trees."},
+    )
+
+    assert response.status_code == 200
+    assert "retrieval_debug" not in response.json()
+
+
+def test_advisor_parse_debug_true_includes_retrieval_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": "Epic pass from Boston for 3 days, budget $1000, trees.",
+            "debug": True,
+        },
+    )
+    retrieval_debug = response.json()["retrieval_debug"]
+
+    assert response.status_code == 200
+    assert retrieval_debug["query"] == (
+        "Epic pass from Boston for 3 days, budget $1000, trees."
+    )
+    assert retrieval_debug["top_k"] == 3
+    assert retrieval_debug["retrieved_chunks"]
+
+
+def test_advisor_parse_no_key_debug_reports_keyword_fallback(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": "Epic pass from Boston for 3 days, budget $1000, trees.",
+            "debug": True,
+        },
+    )
+
+    assert response.json()["retrieval_debug"]["mode"] == "keyword_fallback"
+
+
+def test_advisor_parse_debug_does_not_call_openai_embeddings_without_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(api_key: str, model: str, texts: list[str]) -> list[list[float]]:
+        raise AssertionError("OpenAI embeddings should not be called without API key")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(embedding_retriever, "_call_openai_embeddings", fail_if_called)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": "Epic pass from Boston for 3 days, budget $1000, trees.",
+            "debug": True,
+        },
+    )
+
+    assert response.status_code == 200
+
+
 def test_embedding_retrieval_fallback_works_without_openai_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -556,6 +645,24 @@ def test_embedding_retrieval_top_k_is_respected(
     )
 
     assert len(context.splitlines()) == 1
+
+
+def test_embedding_retrieval_debug_top_k_is_respected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    _, debug = embedding_retriever.retrieve_embedding_context_with_debug(
+        "I want trees and powder.",
+        recommendations,
+        top_k=2,
+    )
+
+    assert debug["top_k"] == 2
+    assert len(debug["retrieved_chunks"]) == 2
 
 
 def test_embedding_retrieval_uses_embedding_similarity_when_api_key_exists(

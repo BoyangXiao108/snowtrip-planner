@@ -16,28 +16,57 @@ def retrieve_embedding_context(
     recommendations,
     top_k: int = 3,
 ) -> str:
+    context, _ = retrieve_embedding_context_with_debug(query, recommendations, top_k)
+
+    return context
+
+
+def retrieve_embedding_context_with_debug(
+    query: str,
+    recommendations,
+    top_k: int = 3,
+) -> tuple[str, dict]:
     limited_recommendations = _limit_recommendations(recommendations, top_k)
     api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
-        return knowledge.retrieve_knowledge_context(limited_recommendations, query)
+        return _keyword_fallback_context_with_debug(
+            query,
+            limited_recommendations,
+            top_k,
+        )
 
     try:
         chunks = _build_searchable_chunks()
         recommendation_names = _recommendation_names(recommendations)
         candidate_chunks = _preferred_recommendation_chunks(chunks, recommendation_names)
-        ranked_chunks = _rank_chunks_by_embedding_similarity(
+        ranked_results = _rank_chunks_by_embedding_similarity(
             api_key,
             query,
             candidate_chunks,
             recommendation_names,
         )
     except Exception:
-        return knowledge.retrieve_knowledge_context(limited_recommendations, query)
+        return _keyword_fallback_context_with_debug(
+            query,
+            limited_recommendations,
+            top_k,
+        )
 
-    selected_chunks = ranked_chunks[:top_k]
+    selected_results = ranked_results[:top_k]
+    selected_chunks = [result["chunk"] for result in selected_results]
+    context = "\n".join(chunk["context"] for chunk in selected_chunks)
+    debug = _build_debug_payload(
+        mode="embedding",
+        query=query,
+        top_k=top_k,
+        chunks=[
+            _debug_chunk(result["chunk"], round(result["score"], 4))
+            for result in selected_results
+        ],
+    )
 
-    return "\n".join(chunk["context"] for chunk in selected_chunks)
+    return context, debug
 
 
 def _build_searchable_chunks() -> list[dict]:
@@ -92,7 +121,13 @@ def _rank_chunks_by_embedding_similarity(
 
     scored_chunks.sort(key=lambda item: (-item[0], item[1]))
 
-    return [chunk for _, _, chunk in scored_chunks]
+    return [
+        {
+            "score": score,
+            "chunk": chunk,
+        }
+        for score, _, chunk in scored_chunks
+    ]
 
 
 def _preferred_recommendation_chunks(
@@ -144,6 +179,73 @@ def _cosine_similarity(left: list[float], right: list[float]) -> float:
 
 def _limit_recommendations(recommendations, top_k: int):
     return list(recommendations)[: max(top_k, 0)]
+
+
+def _keyword_fallback_context_with_debug(
+    query: str,
+    recommendations,
+    top_k: int,
+) -> tuple[str, dict]:
+    context = knowledge.retrieve_knowledge_context(recommendations, query)
+    chunks = []
+
+    for recommendation in recommendations:
+        resort_knowledge = knowledge.get_knowledge_for_resort(
+            _recommendation_name(recommendation)
+        )
+        if not resort_knowledge:
+            continue
+
+        chunks.append(_debug_chunk(_knowledge_chunk(resort_knowledge), None))
+
+    debug = _build_debug_payload(
+        mode="keyword_fallback",
+        query=query,
+        top_k=top_k,
+        chunks=chunks,
+    )
+
+    return context, debug
+
+
+def _knowledge_chunk(resort_knowledge: dict) -> dict:
+    context = _format_knowledge_chunk(resort_knowledge)
+
+    return {
+        "resort_name": resort_knowledge["name"],
+        "text": context,
+        "context": context,
+    }
+
+
+def _build_debug_payload(
+    mode: str,
+    query: str,
+    top_k: int,
+    chunks: list[dict],
+) -> dict:
+    return {
+        "mode": mode,
+        "query": query,
+        "top_k": top_k,
+        "retrieved_chunks": chunks,
+    }
+
+
+def _debug_chunk(chunk: dict, score: float | None) -> dict:
+    return {
+        "resort_name": chunk["resort_name"],
+        "score": score,
+        "source": "resort_knowledge.json",
+        "text_preview": _text_preview(chunk["context"]),
+    }
+
+
+def _text_preview(text: str, max_length: int = 180) -> str:
+    if len(text) <= max_length:
+        return text
+
+    return f"{text[: max_length - 3].rstrip()}..."
 
 
 def _recommendation_names(recommendations) -> set[str]:

@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V6.8 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and lightweight local knowledge retrieval.
+Backend V6.9 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and lightweight local knowledge retrieval.
 
 ## Features
 
@@ -84,6 +84,39 @@ curl -X POST http://127.0.0.1:8000/advisor/parse \
 ```
 
 Without `OPENAI_API_KEY`, parsing uses deterministic keyword rules and safe defaults. With `OPENAI_API_KEY`, the backend can use OpenAI to parse the message, then falls back locally if the call fails.
+
+Add `"debug": true` to include retrieval metadata for the local knowledge context:
+
+```bash
+curl -X POST http://127.0.0.1:8000/advisor/parse \
+  -H "Content-Type: application/json" \
+  -d '{
+    "message": "I have Epic Pass, leaving from Boston for 3 days, budget $1000, I like trees and powder.",
+    "debug": true
+  }'
+```
+
+Debug responses include `retrieval_debug` with the retrieval mode, query, `top_k`, and retrieved knowledge chunks:
+
+```json
+{
+  "retrieval_debug": {
+    "mode": "keyword_fallback",
+    "query": "I have Epic Pass, leaving from Boston for 3 days, budget $1000, I like trees and powder.",
+    "top_k": 3,
+    "retrieved_chunks": [
+      {
+        "resort_name": "Stowe",
+        "score": null,
+        "source": "resort_knowledge.json",
+        "text_preview": "Stowe: terrain_notes=Classic Vermont terrain..."
+      }
+    ]
+  }
+}
+```
+
+When `debug` is false or omitted, `retrieval_debug` is not included.
 
 ## Local Resort Knowledge Base
 
