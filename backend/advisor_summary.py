@@ -1,5 +1,6 @@
 import os
 
+import knowledge
 from openai_client import call_openai_responses
 from schemas import ResortRecommendation
 
@@ -44,7 +45,19 @@ def build_advisor_context(recommendations: list[ResortRecommendation]) -> str:
             )
         )
 
-    return "\n".join(context_lines)
+    recommendation_context = "\n".join(context_lines)
+    knowledge_context = knowledge.build_knowledge_context_for_recommendations(
+        recommendations
+    )
+
+    if not knowledge_context:
+        return recommendation_context
+
+    return (
+        f"{recommendation_context}\n\n"
+        "Local resort knowledge for explanation only; do not override calculated scores:\n"
+        f"{knowledge_context}"
+    )
 
 
 def fallback_summary(recommendations: list[ResortRecommendation]) -> str:
@@ -53,12 +66,14 @@ def fallback_summary(recommendations: list[ResortRecommendation]) -> str:
 
     best = recommendations[0]
     alternatives = recommendations[1:]
+    knowledge_note = _knowledge_note(best)
 
     return (
         f"Best pick: {best.name} in {best.state}. It has the top score "
         f"({best.total_score}), an estimated total cost of "
         f"${best.estimated_total_cost}, and a {best.drive_hours}-hour drive. "
-        f"{best.reason} {_snow_summary(best)}{_alternative_summary(alternatives)}"
+        f"{best.reason} {_snow_summary(best)}{knowledge_note}"
+        f"{_alternative_summary(alternatives)}"
     )
 
 
@@ -114,3 +129,12 @@ def _weather_text(recommendation: ResortRecommendation) -> str:
         f"snowfall_inches_today={weather.snowfall_inches_today}, "
         f"snowfall_inches_next_3_days={weather.snowfall_inches_next_3_days}"
     )
+
+
+def _knowledge_note(recommendation: ResortRecommendation) -> str:
+    resort_knowledge = knowledge.get_knowledge_for_resort(recommendation.name)
+
+    if not resort_knowledge:
+        return ""
+
+    return f"Useful note: {resort_knowledge['trip_tips']} "

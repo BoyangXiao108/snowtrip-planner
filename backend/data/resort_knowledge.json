@@ -1,0 +1,130 @@
+[
+  {
+    "name": "Stowe",
+    "terrain_notes": "Classic Vermont terrain with strong tree skiing, steeps, and polished groomers.",
+    "best_for": "Epic pass holders who want a high-quality Northeast trip with trees and a premium village feel.",
+    "avoid_if": "You need the lowest lodging cost or want a short, low-key day trip.",
+    "trip_tips": "Start early on weekend powder days and plan extra time for mountain road traffic.",
+    "lodging_notes": "Lodging is often pricier near the mountain; nearby towns can offer better value."
+  },
+  {
+    "name": "Killington",
+    "terrain_notes": "Large trail network with strong groomers, terrain parks, and enough variety for mixed groups.",
+    "best_for": "Ikon pass holders who want lots of acreage and nightlife options.",
+    "avoid_if": "You strongly prefer compact, quiet resorts.",
+    "trip_tips": "Use the size of the resort to move around when popular pods get crowded.",
+    "lodging_notes": "Many lodging options sit along the access road with shuttle or short-drive access."
+  },
+  {
+    "name": "Mount Snow",
+    "terrain_notes": "Known for terrain parks and accessible groomers with moderate tree options.",
+    "best_for": "Epic pass holders looking for a closer Vermont option from Boston.",
+    "avoid_if": "Deep trees and expert natural snow are the main priority.",
+    "trip_tips": "Park-focused riders should check Carinthia conditions first.",
+    "lodging_notes": "Nearby inns and condos can keep costs lower than premium Vermont destinations."
+  },
+  {
+    "name": "Okemo",
+    "terrain_notes": "Smooth groomers and approachable cruising terrain are the main strengths.",
+    "best_for": "Epic pass holders who prefer polished groomers and a mellow trip.",
+    "avoid_if": "You want steep, technical trees or a strong park scene.",
+    "trip_tips": "Good choice for mixed ability groups and lower-drama ski days.",
+    "lodging_notes": "Ludlow has convenient lodging and dining near the mountain."
+  },
+  {
+    "name": "Wildcat",
+    "terrain_notes": "Old-school New Hampshire feel with strong views, natural terrain, and tree pockets.",
+    "best_for": "Epic pass holders who want a rugged Northeast day with stronger trees.",
+    "avoid_if": "You need extensive base amenities or lots of beginner-friendly polish.",
+    "trip_tips": "Check wind holds and weather exposure before committing.",
+    "lodging_notes": "Stay in the Mount Washington Valley for more lodging and food options."
+  },
+  {
+    "name": "Attitash",
+    "terrain_notes": "Varied New Hampshire terrain with approachable groomers and some tree options.",
+    "best_for": "Epic pass holders building a practical Mount Washington Valley trip.",
+    "avoid_if": "You are chasing the strongest expert terrain in the region.",
+    "trip_tips": "Pair with Wildcat if conditions favor a multi-mountain trip.",
+    "lodging_notes": "Bartlett and North Conway provide flexible lodging choices."
+  },
+  {
+    "name": "Loon",
+    "terrain_notes": "Accessible New Hampshire resort with strong parks, groomers, and convenient layout.",
+    "best_for": "Ikon pass holders who want a shorter drive and efficient weekend logistics.",
+    "avoid_if": "You want remote, uncrowded powder skiing.",
+    "trip_tips": "Arrive early on weekends because convenience can mean crowds.",
+    "lodging_notes": "Lincoln offers practical lodging close to the resort."
+  },
+  {
+    "name": "Sunday River",
+    "terrain_notes": "Broad Maine resort with many pods, reliable groomers, and moderate tree/park options.",
+    "best_for": "Ikon pass holders who want variety across a multi-day Northeast trip.",
+    "avoid_if": "You need the shortest possible drive from Boston.",
+    "trip_tips": "Move between peaks to find better snow and shorter lift lines.",
+    "lodging_notes": "On-mountain and Bethel-area lodging both work well for multi-day trips."
+  },
+  {
+    "name": "Sugarloaf",
+    "terrain_notes": "Big-mountain Maine feel with stronger expert terrain, trees, and wind-exposed upper mountain zones.",
+    "best_for": "Ikon pass holders willing to drive farther for a more serious Northeast mountain.",
+    "avoid_if": "You need easy travel logistics or mild weather exposure.",
+    "trip_tips": "Watch upper mountain wind and snow reports before choosing ski days.",
+    "lodging_notes": "On-mountain lodging is convenient because the resort is remote."
+  },
+  {
+    "name": "Jay Peak",
+    "terrain_notes": "Tree-heavy Vermont resort known for natural snow and glades.",
+    "best_for": "Skiers prioritizing trees and powder over pass alignment.",
+    "avoid_if": "You need Epic or Ikon pass value or polished groomer-first terrain.",
+    "trip_tips": "Best when recent snow supports glade coverage.",
+    "lodging_notes": "Lodging is more limited nearby, so book early for storm cycles."
+  },
+  {
+    "name": "Vail",
+    "terrain_notes": "Huge Colorado resort with expansive bowls, groomers, trees, and premium infrastructure.",
+    "best_for": "Epic pass holders planning a longer Western destination trip.",
+    "avoid_if": "You have a short trip from Boston or a tight lodging budget.",
+    "trip_tips": "Use back bowls timing carefully and expect premium destination logistics.",
+    "lodging_notes": "Lodging is expensive near the village; nearby towns may reduce cost."
+  },
+  {
+    "name": "Breckenridge",
+    "terrain_notes": "High-alpine Colorado resort with excellent park options, groomers, and varied bowls.",
+    "best_for": "Epic pass holders who care about park, town energy, and broad terrain choice.",
+    "avoid_if": "You want quiet lodging or low crowds during peak travel periods.",
+    "trip_tips": "Altitude can matter; build in adjustment time for longer trips.",
+    "lodging_notes": "Town lodging is convenient but often pricey in peak season."
+  },
+  {
+    "name": "Park City",
+    "terrain_notes": "Large Utah resort with extensive groomers, park options, and easy town access.",
+    "best_for": "Epic pass holders who want destination skiing with strong non-ski amenities.",
+    "avoid_if": "You are mostly chasing steep powder terrain.",
+    "trip_tips": "Use the large footprint to spread out and avoid bottlenecks.",
+    "lodging_notes": "Staying near town gives good dining and transit convenience."
+  },
+  {
+    "name": "Snowbird",
+    "terrain_notes": "Steep Utah terrain with major powder upside and strong expert appeal.",
+    "best_for": "Ikon pass holders who prioritize powder and challenging terrain.",
+    "avoid_if": "You prefer mellow groomers or beginner-heavy group trips.",
+    "trip_tips": "Storm days can be excellent, but terrain intensity and visibility matter.",
+    "lodging_notes": "Canyon lodging is convenient but limited; Salt Lake lodging can reduce cost."
+  },
+  {
+    "name": "Winter Park",
+    "terrain_notes": "Colorado resort with strong trees, bumps, groomers, and a practical Front Range feel.",
+    "best_for": "Ikon pass holders looking for terrain variety without the most premium lodging costs.",
+    "avoid_if": "You want the shortest travel from Boston for a 3-day trip.",
+    "trip_tips": "Explore Mary Jane if trees and bumps are priorities.",
+    "lodging_notes": "Town and nearby lodging can be more budget-friendly than marquee Colorado resorts."
+  },
+  {
+    "name": "Steamboat",
+    "terrain_notes": "Colorado resort known for trees, softer snow, and a welcoming destination feel.",
+    "best_for": "Ikon pass holders who want trees and powder on a longer Western trip.",
+    "avoid_if": "You need short-trip efficiency from the East Coast.",
+    "trip_tips": "Tree-focused skiers should prioritize storm cycles and visibility windows.",
+    "lodging_notes": "Destination lodging can add up, but town options provide variety."
+  }
+]

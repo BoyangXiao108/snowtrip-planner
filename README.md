@@ -11,6 +11,7 @@ Backend V6.3 for a simple ski resort recommendation API with weighted terrain sc
 - Snow-aware scoring
 - AI advisor summary
 - Natural-language trip parsing
+- Local resort knowledge base
 - Docker
 - GitHub Actions CI
 
@@ -82,6 +83,12 @@ curl -X POST http://127.0.0.1:8000/advisor/parse \
 ```
 
 Without `OPENAI_API_KEY`, parsing uses deterministic keyword rules and safe defaults. With `OPENAI_API_KEY`, the backend can use OpenAI to parse the message, then falls back locally if the call fails.
+
+## Local Resort Knowledge Base
+
+The backend includes a structured local knowledge file at `backend/data/resort_knowledge.json`. Each resort has terrain notes, best-use cases, avoid-if guidance, trip tips, and lodging notes.
+
+This knowledge is used only to enrich advisor explanations. It does not override calculated recommendation scores. The structure prepares the project for future RAG work, but this version does not add embeddings, a vector database, document upload, or scraping.
 
 ## Weather
 

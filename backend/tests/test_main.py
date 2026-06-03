@@ -3,6 +3,7 @@ import json
 import pytest
 
 import advisor_summary
+import knowledge
 import trip_parser
 import weather
 from main import app
@@ -407,6 +408,36 @@ def test_advisor_does_not_call_openai_without_api_key(
     response = client.post("/advisor", json=VALID_REQUEST)
 
     assert response.status_code == 200
+
+
+def test_knowledge_file_loads() -> None:
+    resort_knowledge = knowledge.load_resort_knowledge()
+
+    assert len(resort_knowledge) >= 16
+    assert all("name" in entry for entry in resort_knowledge)
+
+
+def test_valid_resort_knowledge_lookup_works() -> None:
+    resort_knowledge = knowledge.get_knowledge_for_resort("Stowe")
+
+    assert resort_knowledge is not None
+    assert resort_knowledge["name"] == "Stowe"
+    assert resort_knowledge["trip_tips"]
+
+
+def test_invalid_resort_knowledge_lookup_returns_none() -> None:
+    assert knowledge.get_knowledge_for_resort("NotAResort") is None
+
+
+def test_advisor_fallback_includes_knowledge_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    advisor_summary_text = response.json()["advisor_summary"]
+
+    assert "Useful note:" in advisor_summary_text
 
 
 def test_advisor_parse_epic_boston_days_budget_trees_powder(
