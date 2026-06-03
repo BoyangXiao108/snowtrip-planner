@@ -13,7 +13,12 @@ VALID_REQUEST = {
     "days": 3,
     "budget": 1000,
     "pass_type": "Epic",
-    "preferences": ["trees", "powder"],
+    "terrain_weights": {
+        "trees": 5,
+        "powder": 4,
+        "groomers": 2,
+        "park": 0,
+    },
 }
 
 
@@ -36,7 +41,7 @@ def test_health_check_returns_ok() -> None:
     assert response.json() == {"status": "ok"}
 
 
-def test_recommend_returns_200_for_valid_request() -> None:
+def test_recommend_returns_200_for_valid_weighted_terrain_request() -> None:
     response = client.post("/recommend", json=VALID_REQUEST)
 
     assert response.status_code == 200
@@ -55,11 +60,12 @@ def test_each_recommendation_includes_total_score() -> None:
     assert all("total_score" in recommendation for recommendation in recommendations)
 
 
-def test_recommend_reason_mentions_all_selected_preferences() -> None:
+def test_recommend_reason_mentions_weighted_terrain_score() -> None:
     response = client.post("/recommend", json=VALID_REQUEST)
     reason = response.json()["recommendations"][0]["reason"]
 
-    assert "selected preferences are trees, powder" in reason
+    assert "weighted terrain score is" in reason
+    assert "based on trees 5, powder 4, groomers 2" in reason
 
 
 def test_recommend_does_not_fetch_weather(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -83,8 +89,30 @@ def test_invalid_pass_type_returns_422() -> None:
     assert response.status_code == 422
 
 
-def test_invalid_preferences_returns_422() -> None:
-    payload = VALID_REQUEST | {"preferences": ["trees", "apres"]}
+def test_all_zero_terrain_weights_returns_422() -> None:
+    payload = VALID_REQUEST | {
+        "terrain_weights": {
+            "trees": 0,
+            "powder": 0,
+            "groomers": 0,
+            "park": 0,
+        }
+    }
+
+    response = client.post("/recommend", json=payload)
+
+    assert response.status_code == 422
+
+
+def test_terrain_weight_above_five_returns_422() -> None:
+    payload = VALID_REQUEST | {
+        "terrain_weights": {
+            "trees": 6,
+            "powder": 4,
+            "groomers": 2,
+            "park": 0,
+        }
+    }
 
     response = client.post("/recommend", json=payload)
 

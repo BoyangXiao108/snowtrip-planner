@@ -188,11 +188,11 @@ def find_resort_by_name(resort_name: str) -> dict | None:
 
 def _score_resort(resort: dict, request: RecommendRequest) -> float:
     total_cost = _estimate_total_cost(resort, request)
-    terrain_score = _terrain_score(resort, request)
+    weighted_terrain_score = _weighted_terrain_score(resort, request)
 
     score = 0.0
     score += _pass_score(resort, request)
-    score += terrain_score * 6
+    score += weighted_terrain_score * 6
     score += _budget_score(total_cost, request.budget)
     score += _travel_score(resort["drive_hours"])
 
@@ -256,9 +256,8 @@ def _estimate_total_cost(resort: dict, request: RecommendRequest) -> int:
 
 
 def _build_reason(resort: dict, request: RecommendRequest, total_cost: int) -> str:
-    terrain_score = _terrain_score(resort, request)
-    preference_text = ", ".join(request.preferences)
-    max_terrain_score = len(request.preferences) * 10
+    weighted_terrain_score = _weighted_terrain_score(resort, request)
+    weight_text = _terrain_weight_text(request)
 
     if resort["pass_type"] == request.pass_type:
         pass_reason = f"matches your {request.pass_type} pass"
@@ -275,11 +274,27 @@ def _build_reason(resort: dict, request: RecommendRequest, total_cost: int) -> s
     travel_reason = f"{resort['drive_hours']} hours from {request.origin}"
 
     return (
-        f"{pass_reason}; selected preferences are {preference_text}; "
-        f"combined terrain score is {terrain_score}/{max_terrain_score}; "
+        f"{pass_reason}; weighted terrain score is {weighted_terrain_score}/10 "
+        f"based on {weight_text}; "
         f"{budget_reason}; travel distance is {travel_reason}."
     )
 
 
-def _terrain_score(resort: dict, request: RecommendRequest) -> int:
-    return sum(resort["terrain_scores"][preference] for preference in request.preferences)
+def _weighted_terrain_score(resort: dict, request: RecommendRequest) -> float:
+    total_weight = sum(request.terrain_weights.values())
+    weighted_score = sum(
+        resort["terrain_scores"][preference] * weight
+        for preference, weight in request.terrain_weights.items()
+    )
+
+    return round(weighted_score / total_weight, 1)
+
+
+def _terrain_weight_text(request: RecommendRequest) -> str:
+    weighted_preferences = [
+        f"{preference} {weight}"
+        for preference, weight in request.terrain_weights.items()
+        if weight > 0
+    ]
+
+    return ", ".join(weighted_preferences)

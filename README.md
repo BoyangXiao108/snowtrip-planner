@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V3 for a simple ski resort recommendation API with multi-preference terrain scoring and basic weather forecast support.
+Backend V4 for a simple ski resort recommendation API with weighted terrain scoring and basic weather forecast support.
 
 ## Project Structure
 
@@ -83,7 +83,12 @@ curl -X POST http://127.0.0.1:8000/recommend \
     "days": 3,
     "budget": 1000,
     "pass_type": "Epic",
-    "preferences": ["trees", "powder"]
+    "terrain_weights": {
+      "trees": 5,
+      "powder": 4,
+      "groomers": 2,
+      "park": 0
+    }
   }'
 ```
 
@@ -99,8 +104,8 @@ Example response shape:
       "drive_hours": 3.6,
       "estimated_lodging_cost": 735,
       "estimated_total_cost": 897,
-      "total_score": 165.4,
-      "reason": "matches your Epic pass; selected preferences are trees, powder; combined terrain score is 17/20; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston.",
+      "total_score": 114.4,
+      "reason": "matches your Epic pass; weighted terrain score is 8.5/10 based on trees 5, powder 4, groomers 2; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston.",
       "weather": null
     }
   ]

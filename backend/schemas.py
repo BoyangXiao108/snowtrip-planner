@@ -1,6 +1,6 @@
 from typing import Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 
 PassType = Literal["Epic", "Ikon", "None"]
@@ -12,7 +12,22 @@ class RecommendRequest(BaseModel):
     days: int = Field(..., ge=1)
     budget: int = Field(..., ge=1)
     pass_type: PassType
-    preferences: list[Preference] = Field(..., min_length=1)
+    terrain_weights: dict[Preference, int]
+
+    @field_validator("terrain_weights")
+    @classmethod
+    def validate_terrain_weights(
+        cls,
+        terrain_weights: dict[Preference, int],
+    ) -> dict[Preference, int]:
+        if not any(weight > 0 for weight in terrain_weights.values()):
+            raise ValueError("At least one terrain weight must be greater than 0")
+
+        for weight in terrain_weights.values():
+            if weight < 0 or weight > 5:
+                raise ValueError("Terrain weights must be between 0 and 5")
+
+        return terrain_weights
 
 
 class WeatherForecast(BaseModel):
