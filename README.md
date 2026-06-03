@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V5.1 for a simple ski resort recommendation API with weighted terrain scoring and 3-day snow forecast support.
+Backend V5.2 for a simple ski resort recommendation API with weighted terrain scoring and snow condition scoring.
 
 ## Project Structure
 
@@ -54,7 +54,7 @@ Example weather response:
 }
 ```
 
-If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations keep the `weather` field in the response, but it is `null` unless weather is requested through this endpoint.
+If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations include `snow_score` when the 3-day snowfall forecast is available.
 
 ## Run With Docker
 
@@ -121,9 +121,16 @@ Example response shape:
       "drive_hours": 3.6,
       "estimated_lodging_cost": 735,
       "estimated_total_cost": 897,
-      "total_score": 114.4,
-      "reason": "matches your Epic pass; weighted terrain score is 8.5/10 based on trees 5, powder 4, groomers 2; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston.",
-      "weather": null
+      "total_score": 119.4,
+      "snow_score": 5.0,
+      "reason": "matches your Epic pass; weighted terrain score is 8.5/10 based on trees 5, powder 4, groomers 2; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston; 3-day snow forecast is 7.7 inches, adding snow score 5.",
+      "weather": {
+        "temperature_f": 24.5,
+        "wind_speed_mph": 12.0,
+        "snowfall_inches": 3.2,
+        "snowfall_inches_today": 3.2,
+        "snowfall_inches_next_3_days": 7.7
+      }
     }
   ]
 }

@@ -1,4 +1,5 @@
 from schemas import RecommendRequest, ResortRecommendation
+import weather
 
 
 RESORTS = [
@@ -171,14 +172,14 @@ WESTERN_STATES = {"Colorado", "Utah"}
 
 def recommend_resorts(request: RecommendRequest) -> list[ResortRecommendation]:
     scored_resorts = [
-        (_score_resort(resort, request), resort)
+        _score_resort_with_weather(resort, request)
         for resort in RESORTS
     ]
-    ranked_resorts = sorted(scored_resorts, key=lambda item: item[0], reverse=True)
+    ranked_resorts = sorted(scored_resorts, key=lambda item: item["total_score"], reverse=True)
 
     return [
-        _build_recommendation(resort, request, score)
-        for score, resort in ranked_resorts[:3]
+        _build_recommendation(scored_resort["resort"], request, scored_resort)
+        for scored_resort in ranked_resorts[:3]
     ]
 
 
@@ -187,6 +188,26 @@ def find_resort_by_name(resort_name: str) -> dict | None:
 
 
 def _score_resort(resort: dict, request: RecommendRequest) -> float:
+    return _base_score_resort(resort, request)
+
+
+def _score_resort_with_weather(resort: dict, request: RecommendRequest) -> dict:
+    weather_forecast = _safe_weather_for_resort(resort)
+    snow_score = _snow_score(weather_forecast)
+    total_score = _base_score_resort(resort, request)
+
+    if snow_score is not None:
+        total_score += snow_score
+
+    return {
+        "resort": resort,
+        "total_score": round(total_score, 1),
+        "snow_score": snow_score,
+        "weather": weather_forecast,
+    }
+
+
+def _base_score_resort(resort: dict, request: RecommendRequest) -> float:
     total_cost = _estimate_total_cost(resort, request)
     weighted_terrain_score = _weighted_terrain_score(resort, request)
 
@@ -229,10 +250,12 @@ def _is_western_short_trip(resort: dict, request: RecommendRequest) -> bool:
 def _build_recommendation(
     resort: dict,
     request: RecommendRequest,
-    total_score: float,
+    scored_resort: dict,
 ) -> ResortRecommendation:
     lodging_cost = resort["lodging_per_night"] * request.days
     total_cost = _estimate_total_cost(resort, request)
+    weather_forecast = scored_resort["weather"]
+    snow_score = scored_resort["snow_score"]
 
     return ResortRecommendation(
         name=resort["name"],
@@ -241,9 +264,10 @@ def _build_recommendation(
         drive_hours=resort["drive_hours"],
         estimated_lodging_cost=lodging_cost,
         estimated_total_cost=total_cost,
-        total_score=total_score,
-        reason=_build_reason(resort, request, total_cost),
-        weather=None,
+        total_score=scored_resort["total_score"],
+        snow_score=snow_score,
+        reason=_build_reason(resort, request, total_cost, weather_forecast, snow_score),
+        weather=weather_forecast,
     )
 
 
@@ -255,7 +279,13 @@ def _estimate_total_cost(resort: dict, request: RecommendRequest) -> int:
     return lodging_cost + travel_cost + lift_ticket_cost
 
 
-def _build_reason(resort: dict, request: RecommendRequest, total_cost: int) -> str:
+def _build_reason(
+    resort: dict,
+    request: RecommendRequest,
+    total_cost: int,
+    weather_forecast: dict | None,
+    snow_score: float | None,
+) -> str:
     weighted_terrain_score = _weighted_terrain_score(resort, request)
     weight_text = _terrain_weight_text(request)
 
@@ -272,11 +302,12 @@ def _build_reason(resort: dict, request: RecommendRequest, total_cost: int) -> s
         budget_reason = f"estimated ${total_cost} total is ${total_cost - request.budget} over your ${request.budget} budget"
 
     travel_reason = f"{resort['drive_hours']} hours from {request.origin}"
+    snow_reason = _snow_reason(weather_forecast, snow_score)
 
     return (
         f"{pass_reason}; weighted terrain score is {weighted_terrain_score}/10 "
         f"based on {weight_text}; "
-        f"{budget_reason}; travel distance is {travel_reason}."
+        f"{budget_reason}; travel distance is {travel_reason}; {snow_reason}."
     )
 
 
@@ -298,3 +329,37 @@ def _terrain_weight_text(request: RecommendRequest) -> str:
     ]
 
     return ", ".join(weighted_preferences)
+
+
+def _safe_weather_for_resort(resort: dict) -> dict | None:
+    try:
+        return weather.get_weather_for_resort(resort)
+    except Exception:
+        return None
+
+
+def _snow_score(weather_forecast: dict | None) -> float | None:
+    if weather_forecast is None:
+        return None
+
+    snowfall = weather_forecast.get("snowfall_inches_next_3_days")
+
+    if snowfall is None or snowfall <= 0:
+        return 0
+    if snowfall <= 3:
+        return 2
+    if snowfall <= 8:
+        return 5
+    return 8
+
+
+def _snow_reason(weather_forecast: dict | None, snow_score: float | None) -> str:
+    if weather_forecast is None or snow_score is None:
+        return "snow forecast unavailable"
+
+    snowfall = weather_forecast.get("snowfall_inches_next_3_days")
+
+    if snowfall is None:
+        return "snow forecast unavailable"
+
+    return f"3-day snow forecast is {snowfall} inches, adding snow score {snow_score}"

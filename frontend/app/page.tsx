@@ -20,6 +20,7 @@ type Recommendation = {
   drive_hours: number;
   estimated_total_cost: number;
   total_score: number;
+  snow_score: number | null;
   reason: string;
   weather: Weather | null;
 };
@@ -308,6 +309,11 @@ function RecommendationCard({
           <p className="text-sm font-semibold text-slate-700">
             {recommendation.total_score.toFixed(1)}
           </p>
+          {recommendation.snow_score !== null ? (
+            <p className="mt-1 text-xs font-medium text-sky-700">
+              Snow +{recommendation.snow_score.toFixed(1)}
+            </p>
+          ) : null}
         </div>
       </div>
 

@@ -6,7 +6,7 @@ from resorts import find_resort_by_name, recommend_resorts
 from schemas import RecommendRequest, RecommendResponse, ResortWeatherResponse
 
 
-app = FastAPI(title="Snowtrip Planner API", version="5.1.0")
+app = FastAPI(title="Snowtrip Planner API", version="5.2.0")
 
 app.add_middleware(
     CORSMiddleware,

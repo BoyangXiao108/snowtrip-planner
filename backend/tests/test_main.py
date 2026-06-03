@@ -23,18 +23,33 @@ VALID_REQUEST = {
 }
 
 
-@pytest.fixture
-def mock_weather_api(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fake_weather_for_resort(resort: dict) -> dict:
-        return {
-            "temperature_f": 24.5,
-            "wind_speed_mph": 12.0,
-            "snowfall_inches": 3.2,
-            "snowfall_inches_today": 3.2,
-            "snowfall_inches_next_3_days": 7.7,
-        }
+@pytest.fixture(autouse=True)
+def mock_open_meteo_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
 
-    monkeypatch.setattr(weather, "get_weather_for_resort", fake_weather_for_resort)
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 24.5,
+                        "wind_speed_10m": 12.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [3.2, 2.5, 2.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
+        assert "forecast_days=3" in url
+        return FakeResponse()
+
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
 
 
 def test_health_check_returns_ok() -> None:
@@ -63,6 +78,13 @@ def test_each_recommendation_includes_total_score() -> None:
     assert all("total_score" in recommendation for recommendation in recommendations)
 
 
+def test_each_recommendation_includes_snow_score_when_weather_exists() -> None:
+    response = client.post("/recommend", json=VALID_REQUEST)
+    recommendations = response.json()["recommendations"]
+
+    assert all(recommendation["snow_score"] == 5 for recommendation in recommendations)
+
+
 def test_recommend_reason_mentions_weighted_terrain_score() -> None:
     response = client.post("/recommend", json=VALID_REQUEST)
     reason = response.json()["recommendations"][0]["reason"]
@@ -71,9 +93,16 @@ def test_recommend_reason_mentions_weighted_terrain_score() -> None:
     assert "based on trees 5, powder 4, groomers 2" in reason
 
 
-def test_recommend_does_not_fetch_weather(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_recommend_reason_mentions_snow_forecast_when_available() -> None:
+    response = client.post("/recommend", json=VALID_REQUEST)
+    reason = response.json()["recommendations"][0]["reason"]
+
+    assert "3-day snow forecast is 7.7 inches" in reason
+
+
+def test_recommend_handles_weather_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_if_called(resort: dict) -> dict:
-        raise AssertionError("POST /recommend should not call the weather API")
+        raise RuntimeError("Weather API failed")
 
     monkeypatch.setattr(weather, "get_weather_for_resort", fail_if_called)
 
@@ -82,6 +111,7 @@ def test_recommend_does_not_fetch_weather(monkeypatch: pytest.MonkeyPatch) -> No
 
     assert response.status_code == 200
     assert all(recommendation["weather"] is None for recommendation in recommendations)
+    assert all(recommendation["snow_score"] is None for recommendation in recommendations)
 
 
 def test_invalid_pass_type_returns_422() -> None:
@@ -138,7 +168,7 @@ def test_budget_zero_returns_422() -> None:
     assert response.status_code == 422
 
 
-def test_weather_returns_200_for_valid_resort(mock_weather_api: None) -> None:
+def test_weather_returns_200_for_valid_resort() -> None:
     response = client.get("/weather/Stowe")
 
     assert response.status_code == 200
@@ -161,8 +191,8 @@ def test_weather_returns_404_for_invalid_resort() -> None:
 
 
 def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch) -> None:
-    class FakeResponse:
-        def __enter__(self) -> "FakeResponse":
+    class SnowfallResponse:
+        def __enter__(self) -> "SnowfallResponse":
             return self
 
         def __exit__(self, *args: object) -> None:
@@ -181,9 +211,9 @@ def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch)
                 }
             ).encode("utf-8")
 
-    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
+    def fake_urlopen(url: str, timeout: int) -> SnowfallResponse:
         assert "forecast_days=3" in url
-        return FakeResponse()
+        return SnowfallResponse()
 
     monkeypatch.setattr(weather, "urlopen", fake_urlopen)
 
