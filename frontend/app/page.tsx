@@ -28,13 +28,19 @@ type RecommendResponse = {
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
+const TERRAIN_OPTIONS: { value: Preference; label: string }[] = [
+  { value: "trees", label: "Trees" },
+  { value: "park", label: "Park" },
+  { value: "groomers", label: "Groomers" },
+  { value: "powder", label: "Powder" },
+];
 
 export default function Home() {
   const [origin, setOrigin] = useState("Boston");
   const [days, setDays] = useState("3");
   const [budget, setBudget] = useState("1000");
   const [passType, setPassType] = useState<PassType>("Epic");
-  const [preference, setPreference] = useState<Preference>("trees");
+  const [preferences, setPreferences] = useState<Preference[]>(["trees"]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,6 +49,12 @@ export default function Home() {
     event.preventDefault();
     setIsLoading(true);
     setError(null);
+
+    if (preferences.length === 0) {
+      setIsLoading(false);
+      setError("Select at least one terrain preference.");
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE_URL}/recommend`, {
@@ -55,7 +67,7 @@ export default function Home() {
           days: Number(days),
           budget: Number(budget),
           pass_type: passType,
-          preference,
+          preferences,
         }),
       });
 
@@ -71,6 +83,14 @@ export default function Home() {
     } finally {
       setIsLoading(false);
     }
+  }
+
+  function togglePreference(preference: Preference) {
+    setPreferences((currentPreferences) =>
+      currentPreferences.includes(preference)
+        ? currentPreferences.filter((item) => item !== preference)
+        : [...currentPreferences, preference],
+    );
   }
 
   return (
@@ -140,19 +160,27 @@ export default function Home() {
                 </select>
               </Field>
 
-              <Field label="Preference">
-                <select
-                  id="preference"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                  value={preference}
-                  onChange={(event) => setPreference(event.target.value as Preference)}
-                >
-                  <option value="trees">Trees</option>
-                  <option value="park">Park</option>
-                  <option value="groomers">Groomers</option>
-                  <option value="powder">Powder</option>
-                </select>
-              </Field>
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium text-slate-800">
+                  Preferences
+                </legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {TERRAIN_OPTIONS.map((option) => (
+                    <label
+                      key={option.value}
+                      className="flex items-center gap-2 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900"
+                    >
+                      <input
+                        type="checkbox"
+                        className="h-4 w-4 rounded border-slate-300 text-teal-700 focus:ring-teal-600"
+                        checked={preferences.includes(option.value)}
+                        onChange={() => togglePreference(option.value)}
+                      />
+                      {option.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
 
               <button
                 type="submit"

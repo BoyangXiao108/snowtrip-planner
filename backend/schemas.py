@@ -12,7 +12,7 @@ class RecommendRequest(BaseModel):
     days: int = Field(..., ge=1)
     budget: int = Field(..., ge=1)
     pass_type: PassType
-    preference: Preference
+    preferences: list[Preference] = Field(..., min_length=1)
 
 
 class WeatherForecast(BaseModel):

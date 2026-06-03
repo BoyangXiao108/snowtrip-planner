@@ -13,7 +13,7 @@ VALID_REQUEST = {
     "days": 3,
     "budget": 1000,
     "pass_type": "Epic",
-    "preference": "trees",
+    "preferences": ["trees", "powder"],
 }
 
 
@@ -55,6 +55,13 @@ def test_each_recommendation_includes_total_score() -> None:
     assert all("total_score" in recommendation for recommendation in recommendations)
 
 
+def test_recommend_reason_mentions_all_selected_preferences() -> None:
+    response = client.post("/recommend", json=VALID_REQUEST)
+    reason = response.json()["recommendations"][0]["reason"]
+
+    assert "selected preferences are trees, powder" in reason
+
+
 def test_recommend_does_not_fetch_weather(monkeypatch: pytest.MonkeyPatch) -> None:
     def fail_if_called(resort: dict) -> dict:
         raise AssertionError("POST /recommend should not call the weather API")
@@ -76,8 +83,8 @@ def test_invalid_pass_type_returns_422() -> None:
     assert response.status_code == 422
 
 
-def test_invalid_preference_returns_422() -> None:
-    payload = VALID_REQUEST | {"preference": "apres"}
+def test_invalid_preferences_returns_422() -> None:
+    payload = VALID_REQUEST | {"preferences": ["trees", "apres"]}
 
     response = client.post("/recommend", json=payload)
 
