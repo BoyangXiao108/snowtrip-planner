@@ -106,6 +106,26 @@ def vector_store_status() -> dict:
     return vector_store.get_vector_store_status()
 
 
+@app.get("/admin/weather/status")
+def weather_status(resort: str) -> dict:
+    found_resort = find_resort_by_name(resort)
+
+    if found_resort is None:
+        return {
+            "provider": "Open-Meteo",
+            "resort_found": False,
+            "resort_name": None,
+            "latitude": None,
+            "longitude": None,
+            "request_url": None,
+            "weather_fetch_success": False,
+            "weather_error": "resort not found",
+            "weather": None,
+        }
+
+    return weather.get_weather_status_for_resort(found_resort)
+
+
 @app.get("/weather/{resort_name}", response_model=ResortWeatherResponse)
 def get_resort_weather(resort_name: str) -> ResortWeatherResponse:
     resort = find_resort_by_name(resort_name)

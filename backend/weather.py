@@ -1,8 +1,11 @@
 import json
+import logging
 import time
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
+
+logger = logging.getLogger(__name__)
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 REQUEST_TIMEOUT_SECONDS = 5
@@ -20,7 +23,8 @@ def get_weather_for_resort(resort: dict) -> dict:
 
     try:
         fresh_weather = _fetch_weather_for_resort(resort)
-    except Exception:
+    except Exception as error:
+        _log_weather_fetch_error(resort, error)
         if cached_weather:
             return cached_weather["weather"]
         raise
@@ -34,6 +38,47 @@ def get_weather_for_resort(resort: dict) -> dict:
 
 
 def _fetch_weather_for_resort(resort: dict) -> dict:
+    url = build_open_meteo_url(resort)
+
+    with urlopen(url, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+        data = json.loads(response.read().decode("utf-8"))
+
+    return _parse_weather_response(data)
+
+
+def get_weather_status_for_resort(resort: dict) -> dict:
+    request_url = build_open_meteo_url(resort)
+
+    try:
+        forecast = _fetch_weather_for_resort(resort)
+    except Exception as error:
+        _log_weather_fetch_error(resort, error)
+        return {
+            "provider": "Open-Meteo",
+            "resort_found": True,
+            "resort_name": resort["name"],
+            "latitude": resort["latitude"],
+            "longitude": resort["longitude"],
+            "request_url": request_url,
+            "weather_fetch_success": False,
+            "weather_error": f"{type(error).__name__}: {error}",
+            "weather": None,
+        }
+
+    return {
+        "provider": "Open-Meteo",
+        "resort_found": True,
+        "resort_name": resort["name"],
+        "latitude": resort["latitude"],
+        "longitude": resort["longitude"],
+        "request_url": request_url,
+        "weather_fetch_success": True,
+        "weather_error": None,
+        "weather": forecast,
+    }
+
+
+def build_open_meteo_url(resort: dict) -> str:
     params = {
         "latitude": resort["latitude"],
         "longitude": resort["longitude"],
@@ -44,11 +89,11 @@ def _fetch_weather_for_resort(resort: dict) -> dict:
         "precipitation_unit": "inch",
         "forecast_days": 3,
     }
-    url = f"{OPEN_METEO_URL}?{urlencode(params)}"
 
-    with urlopen(url, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-        data = json.loads(response.read().decode("utf-8"))
+    return f"{OPEN_METEO_URL}?{urlencode(params)}"
 
+
+def _parse_weather_response(data: dict) -> dict:
     current = data.get("current", {})
     daily = data.get("daily", {})
     snowfall = daily.get("snowfall_sum") or []
@@ -71,3 +116,18 @@ def _sum_snowfall(snowfall: list[float | None]) -> float | None:
         return None
 
     return round(sum(valid_amounts), 2)
+
+
+def _log_weather_fetch_error(resort: dict, error: Exception) -> None:
+    logger.warning(
+        (
+            "Open-Meteo weather fetch failed: resort=%s latitude=%s longitude=%s "
+            "exception_type=%s exception_message=%s request_url=%s"
+        ),
+        resort.get("name"),
+        resort.get("latitude"),
+        resort.get("longitude"),
+        type(error).__name__,
+        str(error),
+        build_open_meteo_url(resort),
+    )

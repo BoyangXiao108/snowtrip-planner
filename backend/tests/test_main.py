@@ -233,6 +233,64 @@ def test_weather_returns_404_for_invalid_resort() -> None:
     assert response.status_code == 404
 
 
+def test_admin_weather_status_success() -> None:
+    response = client.get("/admin/weather/status", params={"resort": "Stowe"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "Open-Meteo"
+    assert data["resort_found"] is True
+    assert data["resort_name"] == "Stowe"
+    assert data["latitude"] == 44.5293
+    assert data["longitude"] == -72.7818
+    assert data["request_url"].startswith("https://api.open-meteo.com/v1/forecast")
+    assert "latitude=44.5293" in data["request_url"]
+    assert "longitude=-72.7818" in data["request_url"]
+    assert data["weather_fetch_success"] is True
+    assert data["weather_error"] is None
+    assert data["weather"]["snowfall_inches_next_3_days"] == 7.7
+
+
+def test_admin_weather_status_failure(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_fetch_weather_for_resort(resort: dict) -> dict:
+        raise TimeoutError("Open-Meteo timed out")
+
+    monkeypatch.setattr(
+        weather,
+        "_fetch_weather_for_resort",
+        fake_fetch_weather_for_resort,
+    )
+
+    response = client.get("/admin/weather/status", params={"resort": "Stowe"})
+
+    assert response.status_code == 200
+    data = response.json()
+    assert data["provider"] == "Open-Meteo"
+    assert data["resort_found"] is True
+    assert data["resort_name"] == "Stowe"
+    assert data["weather_fetch_success"] is False
+    assert data["weather_error"] == "TimeoutError: Open-Meteo timed out"
+    assert data["weather"] is None
+    assert data["request_url"].startswith("https://api.open-meteo.com/v1/forecast")
+
+
+def test_admin_weather_status_unknown_resort() -> None:
+    response = client.get("/admin/weather/status", params={"resort": "NotAResort"})
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "provider": "Open-Meteo",
+        "resort_found": False,
+        "resort_name": None,
+        "latitude": None,
+        "longitude": None,
+        "request_url": None,
+        "weather_fetch_success": False,
+        "weather_error": "resort not found",
+        "weather": None,
+    }
+
+
 def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch) -> None:
     class SnowfallResponse:
         def __enter__(self) -> "SnowfallResponse":
