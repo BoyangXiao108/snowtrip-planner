@@ -7,6 +7,7 @@ import knowledge
 
 
 QDRANT_URL = os.getenv("QDRANT_URL", "http://localhost:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY")
 QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "resort_knowledge")
 OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
 DEFAULT_EMBEDDING_MODEL = "text-embedding-3-small"
@@ -121,6 +122,7 @@ def _create_collection(vector_size: int) -> None:
                 "distance": "Cosine",
             }
         },
+        ignore_conflict=True,
     )
 
 
@@ -163,18 +165,33 @@ def _recommended_resort_filter(recommended_resort_names: list[str]) -> dict | No
     }
 
 
-def _qdrant_request(path: str, method: str, payload: dict | None = None) -> dict:
+def _qdrant_request(
+    path: str,
+    method: str,
+    payload: dict | None = None,
+    ignore_conflict: bool = False,
+) -> dict:
+    headers = {"Content-Type": "application/json"}
+
+    if QDRANT_API_KEY:
+        headers["api-key"] = QDRANT_API_KEY
+
     request = Request(
         f"{QDRANT_URL}{path}",
         data=None if payload is None else json.dumps(payload).encode("utf-8"),
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method=method,
     )
 
     try:
         with urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
             return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError) as exc:
+    except HTTPError as exc:
+        if ignore_conflict and exc.code == 409:
+            return {"status": "ok", "result": "collection already exists"}
+
+        raise RuntimeError("Qdrant request failed") from exc
+    except (URLError, TimeoutError) as exc:
         raise RuntimeError("Qdrant request failed") from exc
 
 

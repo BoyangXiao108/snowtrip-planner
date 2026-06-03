@@ -1,6 +1,8 @@
 from fastapi.testclient import TestClient
+from io import BytesIO
 import json
 import pytest
+from urllib.error import HTTPError
 
 import advisor_summary
 import embedding_retriever
@@ -26,6 +28,28 @@ VALID_REQUEST = {
         "park": 0,
     },
 }
+
+
+class FakeQdrantResponse:
+    def __enter__(self) -> "FakeQdrantResponse":
+        return self
+
+    def __exit__(self, *args: object) -> None:
+        return None
+
+    def read(self) -> bytes:
+        return json.dumps({"status": "ok", "result": {}}).encode("utf-8")
+
+
+def _single_qdrant_chunk() -> list[dict]:
+    return [
+        {
+            "id": 1,
+            "resort_name": "Stowe",
+            "text": "Stowe: terrain_notes=Classic Vermont terrain",
+            "source": "resort_knowledge.json",
+        }
+    ]
 
 
 @pytest.fixture(autouse=True)
@@ -69,6 +93,13 @@ def test_health_check_returns_ok() -> None:
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
+
+
+def test_health_returns_ok_and_version() -> None:
+    response = client.get("/health")
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok", "version": "7.1.0"}
 
 
 def test_recommend_returns_200_for_valid_weighted_terrain_request() -> None:
@@ -755,6 +786,82 @@ def test_admin_reindex_knowledge_handles_missing_openai_api_key(
     assert response.status_code == 200
     assert response.json()["status"] == "skipped"
     assert "OPENAI_API_KEY is not set" in response.json()["reason"]
+
+
+def test_reindex_creates_collection_when_missing(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    qdrant_calls = []
+
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        qdrant_calls.append((request.full_url, request.get_method()))
+        return FakeQdrantResponse()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(vector_store, "build_resort_chunks", _single_qdrant_chunk)
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    result = vector_store.upsert_resort_knowledge()
+
+    assert result["status"] == "indexed"
+    assert ("http://localhost:6333/collections/resort_knowledge", "PUT") in qdrant_calls
+    assert any("points?wait=true" in url for url, _ in qdrant_calls)
+
+
+def test_create_collection_conflict_is_handled_gracefully(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        raise HTTPError(
+            request.full_url,
+            409,
+            "Conflict",
+            {},
+            BytesIO(b'{"status":"error"}'),
+        )
+
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    vector_store._create_collection(vector_size=2)
+
+
+def test_reindex_upserts_vectors_after_collection_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    qdrant_calls = []
+
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        qdrant_calls.append((request.full_url, request.get_method()))
+
+        if request.full_url.endswith("/collections/resort_knowledge"):
+            raise HTTPError(
+                request.full_url,
+                409,
+                "Conflict",
+                {},
+                BytesIO(b'{"status":"error"}'),
+            )
+
+        return FakeQdrantResponse()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(vector_store, "build_resort_chunks", _single_qdrant_chunk)
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    result = vector_store.upsert_resort_knowledge()
+
+    assert result["status"] == "indexed"
+    assert any("points?wait=true" in url for url, _ in qdrant_calls)
 
 
 def test_qdrant_query_function_can_be_mocked_without_real_qdrant(

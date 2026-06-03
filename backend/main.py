@@ -1,3 +1,5 @@
+import os
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -16,15 +18,22 @@ from schemas import (
 )
 
 
-app = FastAPI(title="Snowtrip Planner API", version="7.0.0")
+APP_VERSION = "7.1.0"
+DEFAULT_CORS_ORIGINS = [
+    "http://localhost:3000",
+    "http://127.0.0.1:3000",
+    "http://localhost:3001",
+    "http://127.0.0.1:3001",
+]
+
+app = FastAPI(title="Snowtrip Planner API", version=APP_VERSION)
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:3001",
-        "http://127.0.0.1:3001",
+        origin.strip()
+        for origin in os.getenv("CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS)).split(",")
+        if origin.strip()
     ],
     allow_credentials=False,
     allow_methods=["*"],
@@ -35,6 +44,11 @@ app.add_middleware(
 @app.get("/")
 def health_check() -> dict[str, str]:
     return {"status": "ok"}
+
+
+@app.get("/health")
+def health() -> dict[str, str]:
+    return {"status": "ok", "version": APP_VERSION}
 
 
 @app.post("/recommend", response_model=RecommendResponse)

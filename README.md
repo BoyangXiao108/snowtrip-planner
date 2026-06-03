@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V7 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and local Qdrant knowledge retrieval.
+Backend V7.1 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and local or cloud Qdrant knowledge retrieval.
 
 ## Features
 
@@ -40,6 +40,12 @@ uvicorn main:app --reload
 ```
 
 The API will run at `http://127.0.0.1:8000`.
+
+Health check:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
 
 ## AI Trip Advisor
 
@@ -136,7 +142,7 @@ Run the backend and Qdrant together with Docker Compose:
 docker compose up --build
 ```
 
-Qdrant will be available locally at `http://localhost:6333`. The backend service uses `QDRANT_URL=http://qdrant:6333` inside Compose.
+Qdrant will be available locally at `http://localhost:6333`. The backend service uses `QDRANT_URL=http://qdrant:6333` inside Compose. Local Qdrant does not need `QDRANT_API_KEY`, so the Docker Compose setup still works without one.
 
 To build or refresh the local vector collection from `backend/data/resort_knowledge.json`, set `OPENAI_API_KEY` and call:
 
@@ -151,6 +157,82 @@ Retrieval debug mode can show one of three modes:
 - `qdrant`: local Qdrant vector search returned chunks.
 - `embedding`: OpenAI embeddings were available, but Qdrant did not return usable results, so local in-memory embedding ranking was used.
 - `keyword_fallback`: no OpenAI API key was available, or embedding retrieval failed.
+
+## Production Environment Variables
+
+Backend:
+
+```text
+OPENAI_API_KEY=optional, enables OpenAI parsing, summaries, and embeddings
+OPENAI_MODEL=gpt-4.1-mini
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+QDRANT_URL=optional, local or Qdrant Cloud URL
+QDRANT_API_KEY=optional, required for Qdrant Cloud
+QDRANT_COLLECTION=resort_knowledge
+CORS_ORIGINS=https://your-vercel-app.vercel.app
+```
+
+Frontend:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-backend-url
+```
+
+Without `OPENAI_API_KEY`, the backend still runs with deterministic parsing, deterministic summaries, and keyword fallback retrieval. Without `QDRANT_URL`, vector retrieval uses the default local URL and falls back safely if Qdrant is unavailable.
+
+## Render Deployment
+
+Deploy the backend as a Render Web Service:
+
+1. Create a new Web Service from the repository.
+2. Set the root directory to `snowtrip-planner` if Render is connected above this folder.
+3. Use Docker deployment with the existing `Dockerfile`.
+4. Set health check path to `/health`.
+5. Add production environment variables as needed:
+   - `OPENAI_API_KEY`
+   - `OPENAI_MODEL`
+   - `OPENAI_EMBEDDING_MODEL`
+   - `QDRANT_URL`
+   - `QDRANT_API_KEY`
+   - `QDRANT_COLLECTION`
+   - `CORS_ORIGINS`
+6. After deploy, verify:
+
+```bash
+curl https://your-render-service.onrender.com/health
+```
+
+To use Qdrant Cloud, set `QDRANT_URL` to the cluster URL and `QDRANT_API_KEY` to the cluster API key. Then run:
+
+```bash
+curl -X POST https://your-render-service.onrender.com/admin/reindex-knowledge
+```
+
+## Vercel Deployment
+
+Deploy the frontend as a Vercel project:
+
+1. Import the repository into Vercel.
+2. Set the project root to `snowtrip-planner/frontend`.
+3. Keep the default Next.js build settings.
+4. Add:
+
+```text
+NEXT_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com
+```
+
+5. Deploy and verify that the app can submit both Structured Form and Natural Language requests.
+
+## Deployment Checklist
+
+- Backend `/health` returns `{"status":"ok","version":"7.1.0"}`.
+- Render backend has required environment variables configured.
+- Vercel frontend has `NEXT_PUBLIC_API_BASE_URL` pointing at the backend.
+- `CORS_ORIGINS` includes the deployed Vercel frontend origin.
+- If using Qdrant Cloud, `QDRANT_URL` and `QDRANT_API_KEY` are set.
+- If using Qdrant retrieval, `/admin/reindex-knowledge` has been run after deployment.
+- `OPENAI_API_KEY` is set only in backend hosting, not in the frontend.
+- Local Docker still works with `docker compose up --build`.
 
 ## Weather
 

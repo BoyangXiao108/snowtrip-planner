@@ -6,6 +6,7 @@ import { AdvisorSummary } from "../components/AdvisorSummary";
 import { ParsedRequestPanel } from "../components/ParsedRequestPanel";
 import { PlannerForm } from "../components/PlannerForm";
 import { RecommendationCard } from "../components/RecommendationCard";
+import { RetrievalDebugPanel } from "../components/RetrievalDebugPanel";
 import {
   API_BASE_URL,
   DEFAULT_NATURAL_LANGUAGE_MESSAGE,
@@ -18,6 +19,7 @@ import type {
   PassType,
   Preference,
   Recommendation,
+  RetrievalDebug,
   StructuredRequest,
   TerrainWeights,
 } from "../types";
@@ -37,6 +39,8 @@ export default function Home() {
   const [parsedRequest, setParsedRequest] = useState<StructuredRequest | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [advisorSummary, setAdvisorSummary] = useState<string | null>(null);
+  const [retrievalDebug, setRetrievalDebug] = useState<RetrievalDebug | null>(null);
+  const [showRetrievalDetails, setShowRetrievalDetails] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +50,8 @@ export default function Home() {
     setError(null);
     setAdvisorSummary(null);
     setParsedRequest(null);
+    setRetrievalDebug(null);
+    setShowRetrievalDetails(false);
 
     if (mode === "structured" && !hasTerrainWeight(terrainWeights)) {
       setIsLoading(false);
@@ -79,10 +85,15 @@ export default function Home() {
       setRecommendations(data.recommendations);
       setAdvisorSummary(data.advisor_summary?.trim() || null);
       setParsedRequest("parsed_request" in data ? data.parsed_request : null);
+      setRetrievalDebug(
+        "retrieval_debug" in data ? data.retrieval_debug ?? null : null,
+      );
     } catch (error) {
       setRecommendations([]);
       setAdvisorSummary(null);
       setParsedRequest(null);
+      setRetrievalDebug(null);
+      setShowRetrievalDetails(false);
       setError(error instanceof Error ? error.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
@@ -91,7 +102,7 @@ export default function Home() {
 
   function buildRequestBody() {
     if (mode === "natural") {
-      return { message: naturalLanguageMessage };
+      return { message: naturalLanguageMessage, debug: true };
     }
 
     return {
@@ -155,6 +166,16 @@ export default function Home() {
             ) : null}
 
             {parsedRequest ? <ParsedRequestPanel parsedRequest={parsedRequest} /> : null}
+
+            {retrievalDebug ? (
+              <RetrievalDebugPanel
+                isVisible={showRetrievalDetails}
+                retrievalDebug={retrievalDebug}
+                onToggle={() =>
+                  setShowRetrievalDetails((currentValue) => !currentValue)
+                }
+              />
+            ) : null}
 
             <div className="grid gap-4">
               {recommendations.map((recommendation, index) => (

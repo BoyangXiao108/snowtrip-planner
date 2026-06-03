@@ -37,6 +37,21 @@ export type AdvisorResponse = {
   advisor_summary?: string | null;
 };
 
+export type RetrievedChunkDebug = {
+  resort_name: string;
+  score: number | null;
+  source: string;
+  text_preview: string;
+};
+
+export type RetrievalDebug = {
+  mode: "qdrant" | "embedding" | "keyword_fallback";
+  query: string;
+  top_k: number;
+  retrieved_chunks: RetrievedChunkDebug[];
+};
+
 export type ParsedAdvisorResponse = AdvisorResponse & {
   parsed_request: StructuredRequest;
+  retrieval_debug?: RetrievalDebug | null;
 };
