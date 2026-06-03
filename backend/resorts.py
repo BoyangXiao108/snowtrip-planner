@@ -7,6 +7,8 @@ RESORTS = [
         "state": "Vermont",
         "pass_type": "Epic",
         "drive_hours": 3.6,
+        "latitude": 44.5293,
+        "longitude": -72.7818,
         "lodging_per_night": 245,
         "terrain_scores": {"trees": 9, "park": 5, "groomers": 8, "powder": 8},
     },
@@ -15,6 +17,8 @@ RESORTS = [
         "state": "Vermont",
         "pass_type": "Ikon",
         "drive_hours": 2.9,
+        "latitude": 43.6045,
+        "longitude": -72.8201,
         "lodging_per_night": 210,
         "terrain_scores": {"trees": 7, "park": 8, "groomers": 9, "powder": 6},
     },
@@ -23,6 +27,8 @@ RESORTS = [
         "state": "Vermont",
         "pass_type": "Epic",
         "drive_hours": 2.6,
+        "latitude": 42.9584,
+        "longitude": -72.9204,
         "lodging_per_night": 185,
         "terrain_scores": {"trees": 6, "park": 9, "groomers": 8, "powder": 5},
     },
@@ -31,6 +37,8 @@ RESORTS = [
         "state": "Vermont",
         "pass_type": "Epic",
         "drive_hours": 2.8,
+        "latitude": 43.4018,
+        "longitude": -72.7177,
         "lodging_per_night": 195,
         "terrain_scores": {"trees": 6, "park": 5, "groomers": 9, "powder": 5},
     },
@@ -39,6 +47,8 @@ RESORTS = [
         "state": "New Hampshire",
         "pass_type": "Epic",
         "drive_hours": 3.0,
+        "latitude": 44.2642,
+        "longitude": -71.2384,
         "lodging_per_night": 165,
         "terrain_scores": {"trees": 8, "park": 3, "groomers": 6, "powder": 7},
     },
@@ -47,6 +57,8 @@ RESORTS = [
         "state": "New Hampshire",
         "pass_type": "Epic",
         "drive_hours": 2.8,
+        "latitude": 44.0828,
+        "longitude": -71.2292,
         "lodging_per_night": 155,
         "terrain_scores": {"trees": 6, "park": 4, "groomers": 7, "powder": 5},
     },
@@ -55,6 +67,8 @@ RESORTS = [
         "state": "New Hampshire",
         "pass_type": "Ikon",
         "drive_hours": 2.1,
+        "latitude": 44.0565,
+        "longitude": -71.6339,
         "lodging_per_night": 175,
         "terrain_scores": {"trees": 6, "park": 8, "groomers": 8, "powder": 5},
     },
@@ -63,6 +77,8 @@ RESORTS = [
         "state": "Maine",
         "pass_type": "Ikon",
         "drive_hours": 3.4,
+        "latitude": 44.4734,
+        "longitude": -70.8569,
         "lodging_per_night": 180,
         "terrain_scores": {"trees": 7, "park": 7, "groomers": 8, "powder": 6},
     },
@@ -71,6 +87,8 @@ RESORTS = [
         "state": "Maine",
         "pass_type": "Ikon",
         "drive_hours": 4.2,
+        "latitude": 45.0314,
+        "longitude": -70.3131,
         "lodging_per_night": 170,
         "terrain_scores": {"trees": 8, "park": 5, "groomers": 7, "powder": 8},
     },
@@ -79,6 +97,8 @@ RESORTS = [
         "state": "Vermont",
         "pass_type": "None",
         "drive_hours": 4.1,
+        "latitude": 44.9389,
+        "longitude": -72.5046,
         "lodging_per_night": 175,
         "terrain_scores": {"trees": 10, "park": 4, "groomers": 6, "powder": 9},
     },
@@ -87,6 +107,8 @@ RESORTS = [
         "state": "Colorado",
         "pass_type": "Epic",
         "drive_hours": 34.0,
+        "latitude": 39.6061,
+        "longitude": -106.3550,
         "lodging_per_night": 310,
         "terrain_scores": {"trees": 8, "park": 6, "groomers": 9, "powder": 8},
     },
@@ -95,6 +117,8 @@ RESORTS = [
         "state": "Colorado",
         "pass_type": "Epic",
         "drive_hours": 33.6,
+        "latitude": 39.4803,
+        "longitude": -106.0667,
         "lodging_per_night": 230,
         "terrain_scores": {"trees": 6, "park": 10, "groomers": 8, "powder": 7},
     },
@@ -103,6 +127,8 @@ RESORTS = [
         "state": "Utah",
         "pass_type": "Epic",
         "drive_hours": 36.5,
+        "latitude": 40.6514,
+        "longitude": -111.5080,
         "lodging_per_night": 260,
         "terrain_scores": {"trees": 6, "park": 8, "groomers": 9, "powder": 7},
     },
@@ -111,6 +137,8 @@ RESORTS = [
         "state": "Utah",
         "pass_type": "Ikon",
         "drive_hours": 36.3,
+        "latitude": 40.5811,
+        "longitude": -111.6578,
         "lodging_per_night": 240,
         "terrain_scores": {"trees": 8, "park": 4, "groomers": 6, "powder": 10},
     },
@@ -119,6 +147,8 @@ RESORTS = [
         "state": "Colorado",
         "pass_type": "Ikon",
         "drive_hours": 34.4,
+        "latitude": 39.8868,
+        "longitude": -105.7625,
         "lodging_per_night": 190,
         "terrain_scores": {"trees": 8, "park": 6, "groomers": 8, "powder": 7},
     },
@@ -127,12 +157,15 @@ RESORTS = [
         "state": "Colorado",
         "pass_type": "Ikon",
         "drive_hours": 36.0,
+        "latitude": 40.4572,
+        "longitude": -106.8045,
         "lodging_per_night": 220,
         "terrain_scores": {"trees": 9, "park": 5, "groomers": 7, "powder": 9},
     },
 ]
 
 
+RESORT_INDEX = {resort["name"].casefold(): resort for resort in RESORTS}
 WESTERN_STATES = {"Colorado", "Utah"}
 
 
@@ -147,6 +180,10 @@ def recommend_resorts(request: RecommendRequest) -> list[ResortRecommendation]:
         _build_recommendation(resort, request, score)
         for score, resort in ranked_resorts[:3]
     ]
+
+
+def find_resort_by_name(resort_name: str) -> dict | None:
+    return RESORT_INDEX.get(resort_name.casefold())
 
 
 def _score_resort(resort: dict, request: RecommendRequest) -> float:
@@ -206,6 +243,7 @@ def _build_recommendation(
         estimated_total_cost=total_cost,
         total_score=total_score,
         reason=_build_reason(resort, request, total_cost),
+        weather=None,
     )
 
 
@@ -232,7 +270,7 @@ def _build_reason(resort: dict, request: RecommendRequest, total_cost: int) -> s
     else:
         budget_reason = f"estimated ${total_cost} total is ${total_cost - request.budget} over your ${request.budget} budget"
 
-    travel_reason = f"{resort['drive_hours']} hours from Boston"
+    travel_reason = f"{resort['drive_hours']} hours from {request.origin}"
 
     return (
         f"{pass_reason}; {request.preference} terrain score is {terrain_score}/10; "

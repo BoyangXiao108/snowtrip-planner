@@ -15,6 +15,12 @@ class RecommendRequest(BaseModel):
     preference: Preference
 
 
+class WeatherForecast(BaseModel):
+    temperature_f: float | None
+    wind_speed_mph: float | None
+    snowfall_inches: float | None
+
+
 class ResortRecommendation(BaseModel):
     name: str
     state: str
@@ -24,7 +30,13 @@ class ResortRecommendation(BaseModel):
     estimated_total_cost: int
     total_score: float
     reason: str
+    weather: WeatherForecast | None = None
 
 
 class RecommendResponse(BaseModel):
     recommendations: list[ResortRecommendation]
+
+
+class ResortWeatherResponse(BaseModel):
+    resort_name: str
+    weather: WeatherForecast | None

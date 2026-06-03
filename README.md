@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V1 for a simple ski resort recommendation API.
+Backend V2 for a simple ski resort recommendation API with basic weather forecast support.
 
 ## Project Structure
 
@@ -27,6 +27,16 @@ uvicorn main:app --reload
 ```
 
 The API will run at `http://127.0.0.1:8000`.
+
+## Weather
+
+Get a basic forecast for a resort:
+
+```bash
+curl http://127.0.0.1:8000/weather/Stowe
+```
+
+Weather data comes from the Open-Meteo API and does not require an API key. If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations keep the `weather` field in the response, but it is `null` unless weather is requested through this endpoint.
 
 ## Run With Docker
 
@@ -71,7 +81,8 @@ Example response shape:
       "estimated_lodging_cost": 735,
       "estimated_total_cost": 897,
       "total_score": 117.4,
-      "reason": "matches your Epic pass; trees terrain score is 9/10; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston."
+      "reason": "matches your Epic pass; trees terrain score is 9/10; estimated $897 total is within your $1000 budget; travel distance is 3.6 hours from Boston.",
+      "weather": null
     }
   ]
 }
