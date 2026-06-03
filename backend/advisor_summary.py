@@ -1,3 +1,4 @@
+import json
 import os
 
 import embedding_retriever
@@ -7,25 +8,8 @@ from schemas import ResortRecommendation
 
 
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
-ADVISOR_MAX_OUTPUT_TOKENS = 500
-INCOMPLETE_ENDINGS = (
-    " because",
-    " due to",
-    " with",
-    " for",
-    " and",
-    " or",
-    " but",
-    " so",
-    " by",
-    " to",
-    " based on",
-    " compared with",
-    " against",
-    " a",
-    " an",
-    " the",
-)
+ADVISOR_MAX_OUTPUT_TOKENS = 350
+ADVISOR_JSON_FIELDS = ("best_option", "why", "main_tradeoff", "runner_up")
 
 
 def generate_advisor_summary(
@@ -95,19 +79,48 @@ def fallback_summary(
     user_message: str | None = None,
 ) -> str:
     if not recommendations:
-        return "No recommendations are available for this trip."
+        return _format_advisor_summary(
+            {
+                "best_option": "No recommendation available.",
+                "why": "No recommendations are available for this trip.",
+                "main_tradeoff": "No tradeoff can be calculated without recommendations.",
+                "runner_up": "No runner-up available.",
+            }
+        )
 
+    return _format_advisor_summary(
+        _deterministic_advisor_fields(recommendations, user_message)
+    )
+
+
+def _deterministic_advisor_fields(
+    recommendations: list[ResortRecommendation],
+    user_message: str | None = None,
+) -> dict[str, str]:
     best = recommendations[0]
-    alternatives = recommendations[1:]
+    runner_up = recommendations[1] if len(recommendations) > 1 else None
     knowledge_note = _knowledge_note(best, user_message)
 
-    return (
-        f"Best pick: {best.name} in {best.state}. It has the top score "
-        f"({best.total_score}), an estimated total cost of "
-        f"${best.estimated_total_cost}, and a {best.drive_hours}-hour drive. "
-        f"{best.reason} {_snow_summary(best)}{knowledge_note}"
-        f"{_alternative_summary(alternatives)}"
+    main_tradeoff = (
+        (
+            f"{runner_up.name} is the runner-up at "
+            f"${runner_up.estimated_total_cost} and {runner_up.drive_hours} hours."
+        )
+        if runner_up
+        else "No runner-up is available for comparison."
     )
+
+    return {
+        "best_option": f"{best.name}.",
+        "why": (
+            f"{best.name} is ranked first with score {best.total_score}, "
+            f"estimated total cost ${best.estimated_total_cost}, and "
+            f"{best.drive_hours}-hour travel. {best.reason} {_snow_summary(best)}"
+            f"{knowledge_note}"
+        ),
+        "main_tradeoff": main_tradeoff,
+        "runner_up": f"{runner_up.name}." if runner_up else "No runner-up available.",
+    }
 
 
 def _call_openai_advisor(
@@ -118,33 +131,27 @@ def _call_openai_advisor(
 ) -> str:
     prompt = (
         "You are a ski trip advisor. Using only the recommendation data below, "
-        "write a concise trip summary under 160 words. Recommend the best option, explain key "
-        "tradeoffs, and mention budget, terrain fit, travel distance, and snow "
-        "forecast when available. Finish with a complete sentence. "
+        "return strict JSON only with exactly these string fields: "
+        '{"best_option":"...","why":"...","main_tradeoff":"...","runner_up":"..."}. '
+        "The first recommendation is the best option. Do not choose a different "
+        "best option. Do not reorder recommendations. Explain the existing ranking only. "
+        "The best_option value must be the exact name of recommendation #1. "
+        "The runner_up value must be the exact name of recommendation #2 when available. "
+        "The why and main_tradeoff values must each be one short complete sentence. "
+        "Do not use markdown, bullet lists, tables, extra keys, or prose outside the JSON. "
+        "Mention budget, terrain fit, travel distance, and snow forecast only when available. "
         "Do not add facts that are not in the data.\n\n"
         f"{build_advisor_context(recommendations, user_message)}"
     )
-    summary = call_openai_responses(
+    response_text = call_openai_responses(
         api_key,
         model,
         prompt,
         max_tokens=ADVISOR_MAX_OUTPUT_TOKENS,
     )
+    advisor_fields = _parse_advisor_json(response_text, recommendations)
 
-    return _ensure_complete_summary(summary)
-
-
-def _alternative_summary(recommendations: list[ResortRecommendation]) -> str:
-    if not recommendations:
-        return ""
-
-    alternatives = ", ".join(
-        f"{recommendation.name} (${recommendation.estimated_total_cost}, "
-        f"{recommendation.drive_hours} hours)"
-        for recommendation in recommendations
-    )
-
-    return f" Tradeoffs: compare against {alternatives}."
+    return _format_advisor_summary(advisor_fields)
 
 
 def _snow_summary(recommendation: ResortRecommendation) -> str:
@@ -187,28 +194,80 @@ def _knowledge_note(
     return f"Useful note: {readable_field}: {resort_knowledge[field]} "
 
 
-def _ensure_complete_summary(summary: str) -> str:
-    cleaned_summary = " ".join(summary.strip().split())
+def _parse_advisor_json(
+    response_text: str,
+    recommendations: list[ResortRecommendation],
+) -> dict[str, str]:
+    parsed_response = json.loads(response_text)
 
-    if not cleaned_summary:
-        return "The top-ranked resort is the best choice based on the calculated recommendation data."
+    if not isinstance(parsed_response, dict):
+        raise ValueError("Advisor response must be a JSON object")
 
-    if _appears_truncated(cleaned_summary):
-        return (
-            f"{cleaned_summary.rstrip(' ,;:-')}. "
-            "Overall, choose the top-ranked resort based on the calculated recommendation data."
-        )
+    if set(parsed_response.keys()) != set(ADVISOR_JSON_FIELDS):
+        raise ValueError("Advisor response has unexpected JSON fields")
 
-    if cleaned_summary[-1] not in ".!?":
-        return f"{cleaned_summary}."
+    advisor_fields = {}
+    for field in ADVISOR_JSON_FIELDS:
+        value = parsed_response[field]
+        if not isinstance(value, str):
+            raise ValueError("Advisor response fields must be strings")
 
-    return cleaned_summary
+        advisor_fields[field] = _clean_advisor_sentence(value)
+
+    _validate_advisor_ranking_fields(advisor_fields, recommendations)
+
+    return advisor_fields
 
 
-def _appears_truncated(summary: str) -> bool:
-    lowered_summary = summary.casefold().rstrip()
+def _format_advisor_summary(advisor_fields: dict[str, str]) -> str:
+    return (
+        f"Best option: {advisor_fields['best_option']}\n"
+        f"Why: {advisor_fields['why']}\n"
+        f"Main tradeoff: {advisor_fields['main_tradeoff']}\n"
+        f"Runner-up: {advisor_fields['runner_up']}"
+    )
 
-    if lowered_summary[-1] in ",;:-":
-        return True
 
-    return any(lowered_summary.endswith(ending) for ending in INCOMPLETE_ENDINGS)
+def _clean_advisor_sentence(value: str) -> str:
+    sentence = " ".join(value.strip().split())
+
+    if not sentence:
+        raise ValueError("Advisor response fields cannot be empty")
+
+    if _contains_markdown_or_list_syntax(sentence):
+        raise ValueError("Advisor response fields cannot contain markdown or list syntax")
+
+    if sentence[-1] not in ".!?":
+        sentence = f"{sentence}."
+
+    return sentence
+
+
+def _contains_markdown_or_list_syntax(sentence: str) -> bool:
+    return (
+        "**" in sentence
+        or "|" in sentence
+        or sentence.startswith(("-", "*", "•"))
+    )
+
+
+def _validate_advisor_ranking_fields(
+    advisor_fields: dict[str, str],
+    recommendations: list[ResortRecommendation],
+) -> None:
+    if not recommendations:
+        return
+
+    if _normalize_option_name(advisor_fields["best_option"]) != _normalize_option_name(
+        recommendations[0].name
+    ):
+        raise ValueError("Advisor best_option must match the top-ranked recommendation")
+
+    if len(recommendations) > 1 and _normalize_option_name(
+        advisor_fields["runner_up"]
+    ) != _normalize_option_name(recommendations[1].name):
+        raise ValueError("Advisor runner_up must match the second-ranked recommendation")
+
+
+def _normalize_option_name(value: str) -> str:
+    return value.strip().rstrip(".!?").casefold()

@@ -412,7 +412,7 @@ def test_advisor_does_not_call_openai_without_api_key(
     assert response.status_code == 200
 
 
-def test_openai_advisor_summary_does_not_end_with_incomplete_phrase(
+def test_openai_advisor_valid_json_formats_deterministic_summary(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     def fake_openai_response(
@@ -422,7 +422,15 @@ def test_openai_advisor_summary_does_not_end_with_incomplete_phrase(
         max_tokens: int,
     ) -> str:
         assert max_tokens == advisor_summary.ADVISOR_MAX_OUTPUT_TOKENS
-        return "Best pick: Stowe because"
+        assert "strict JSON only" in prompt
+        return json.dumps(
+            {
+                "best_option": "Stowe",
+                "why": "It matches the Epic pass and tree preference within budget.",
+                "main_tradeoff": "It is pricier than closer New Hampshire options.",
+                "runner_up": "Wildcat",
+            }
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
     monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
@@ -431,9 +439,145 @@ def test_openai_advisor_summary_does_not_end_with_incomplete_phrase(
     summary = response.json()["advisor_summary"]
 
     assert response.status_code == 200
-    assert not summary.endswith("because")
+    assert summary == (
+        "Best option: Stowe.\n"
+        "Why: It matches the Epic pass and tree preference within budget.\n"
+        "Main tradeoff: It is pricier than closer New Hampshire options.\n"
+        "Runner-up: Wildcat."
+    )
+
+
+def test_openai_advisor_malformed_json_falls_back_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        return '{"best_option": "Stowe is best", "why":'
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert summary.startswith("Best option: Stowe.")
     assert summary.endswith(".")
-    assert "Overall, choose the top-ranked resort" in summary
+
+
+def test_openai_advisor_long_text_response_falls_back_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        return "Here is a long comparison:\n- **Mount Snow, VT"
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert summary.startswith("Best option: Stowe.")
+    assert "**" not in summary
+    assert not any(line.strip().startswith("-") for line in summary.splitlines())
+
+
+def test_openai_advisor_markdown_json_field_falls_back_safely(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        return json.dumps(
+            {
+                "best_option": "- **Mount Snow, VT",
+                "why": "It fits the request.",
+                "main_tradeoff": "It has tradeoffs.",
+                "runner_up": "Stowe is another option.",
+            }
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert "**" not in summary
+    assert not any(line.strip().startswith("-") for line in summary.splitlines())
+
+
+def test_openai_advisor_best_option_mismatch_falls_back_to_top_ranked_resort(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        assert "The first recommendation is the best option" in prompt
+        return json.dumps(
+            {
+                "best_option": "Wildcat",
+                "why": "Wildcat has a shorter drive.",
+                "main_tradeoff": "Stowe is more expensive.",
+                "runner_up": "Stowe",
+            }
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert summary.startswith("Best option: Stowe.")
+    assert "Best option: Wildcat" not in summary
+
+
+def test_openai_advisor_runner_up_mismatch_falls_back(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_openai_response(
+        api_key: str,
+        model: str,
+        prompt: str,
+        max_tokens: int,
+    ) -> str:
+        return json.dumps(
+            {
+                "best_option": "Stowe",
+                "why": "Stowe is ranked first.",
+                "main_tradeoff": "Wildcat has shorter travel.",
+                "runner_up": "Mount Snow",
+            }
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+    summary = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert summary.startswith("Best option: Stowe.")
+    assert "Runner-up: Wildcat." in summary
 
 
 def test_knowledge_file_loads() -> None:
