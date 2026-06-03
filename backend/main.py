@@ -1,4 +1,5 @@
 from fastapi import FastAPI, HTTPException
+from fastapi.middleware.cors import CORSMiddleware
 
 import weather
 from resorts import find_resort_by_name, recommend_resorts
@@ -6,6 +7,19 @@ from schemas import RecommendRequest, RecommendResponse, ResortWeatherResponse
 
 
 app = FastAPI(title="Snowtrip Planner API", version="2.0.0")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3001",
+        "http://127.0.0.1:3001",
+    ],
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/")

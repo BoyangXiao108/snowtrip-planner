@@ -13,6 +13,7 @@ backend/
   schemas.py
   requirements.txt
   requirements-prod.txt
+frontend/
 README.md
 ```
 
@@ -53,6 +54,24 @@ docker run -p 8000:8000 snowtrip-planner
 ```
 
 The API docs will be available at `http://localhost:8000/docs`.
+
+## Frontend Setup
+
+```bash
+cd snowtrip-planner/frontend
+npm install
+```
+
+## Frontend Run Command
+
+Start the backend first, then run:
+
+```bash
+cd snowtrip-planner/frontend
+npm run dev
+```
+
+The frontend will run at `http://localhost:3000`.
 
 ## Test With curl
 
