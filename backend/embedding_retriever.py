@@ -37,24 +37,24 @@ def retrieve_embedding_context_with_debug(
             top_k,
         )
 
-    try:
-        qdrant_results = vector_store.query_resort_knowledge(
-            query,
-            _recommendation_display_names(recommendations),
-            top_k,
-        )
-        if qdrant_results:
-            context = "\n".join(result["text"] for result in qdrant_results)
-            debug = _build_debug_payload(
-                mode="qdrant",
-                query=query,
-                top_k=top_k,
-                chunks=[_debug_vector_result(result) for result in qdrant_results],
-            )
+    qdrant_debug = vector_store._qdrant_debug(attempted=False)
 
-            return context, debug
-    except Exception:
-        pass
+    qdrant_results, qdrant_debug = vector_store.query_resort_knowledge_with_debug(
+        query,
+        _recommendation_display_names(recommendations),
+        top_k,
+    )
+    if qdrant_results:
+        context = "\n".join(result["text"] for result in qdrant_results)
+        debug = _build_debug_payload(
+            mode="qdrant",
+            query=query,
+            top_k=top_k,
+            chunks=[_debug_vector_result(result) for result in qdrant_results],
+            qdrant_debug=qdrant_debug,
+        )
+
+        return context, debug
 
     try:
         chunks = _build_searchable_chunks()
@@ -71,6 +71,7 @@ def retrieve_embedding_context_with_debug(
             query,
             limited_recommendations,
             top_k,
+            qdrant_debug=qdrant_debug,
         )
 
     selected_results = ranked_results[:top_k]
@@ -84,6 +85,7 @@ def retrieve_embedding_context_with_debug(
             _debug_chunk(result["chunk"], round(result["score"], 4))
             for result in selected_results
         ],
+        qdrant_debug=qdrant_debug,
     )
 
     return context, debug
@@ -205,6 +207,7 @@ def _keyword_fallback_context_with_debug(
     query: str,
     recommendations,
     top_k: int,
+    qdrant_debug: dict | None = None,
 ) -> tuple[str, dict]:
     context = knowledge.retrieve_knowledge_context(recommendations, query)
     chunks = []
@@ -223,6 +226,7 @@ def _keyword_fallback_context_with_debug(
         query=query,
         top_k=top_k,
         chunks=chunks,
+        qdrant_debug=qdrant_debug,
     )
 
     return context, debug
@@ -243,12 +247,18 @@ def _build_debug_payload(
     query: str,
     top_k: int,
     chunks: list[dict],
+    qdrant_debug: dict | None = None,
 ) -> dict:
+    qdrant_debug = qdrant_debug or vector_store._qdrant_debug(attempted=False)
+
     return {
         "mode": mode,
         "query": query,
         "top_k": top_k,
         "retrieved_chunks": chunks,
+        "qdrant_attempted": qdrant_debug["qdrant_attempted"],
+        "qdrant_error": qdrant_debug["qdrant_error"],
+        "qdrant_result_count": qdrant_debug["qdrant_result_count"],
     }
 
 

@@ -76,6 +76,9 @@ class RetrievalDebug(BaseModel):
     mode: Literal["qdrant", "embedding", "keyword_fallback"]
     query: str
     top_k: int
+    qdrant_attempted: bool
+    qdrant_error: str | None
+    qdrant_result_count: int | None
     retrieved_chunks: list[RetrievedChunkDebug]
 
 

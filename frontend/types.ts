@@ -48,6 +48,9 @@ export type RetrievalDebug = {
   mode: "qdrant" | "embedding" | "keyword_fallback";
   query: string;
   top_k: number;
+  qdrant_attempted: boolean;
+  qdrant_error: string | null;
+  qdrant_result_count: number | null;
   retrieved_chunks: RetrievedChunkDebug[];
 };
 

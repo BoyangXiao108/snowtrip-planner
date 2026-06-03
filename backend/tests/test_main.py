@@ -754,15 +754,24 @@ def test_advisor_parse_no_key_debug_reports_keyword_fallback(
         },
     )
 
-    assert response.json()["retrieval_debug"]["mode"] == "keyword_fallback"
+    retrieval_debug = response.json()["retrieval_debug"]
+
+    assert retrieval_debug["mode"] == "keyword_fallback"
+    assert retrieval_debug["qdrant_attempted"] is False
+    assert retrieval_debug["qdrant_error"] is None
+    assert retrieval_debug["qdrant_result_count"] is None
 
 
 def test_app_works_without_qdrant(monkeypatch: pytest.MonkeyPatch) -> None:
-    def fail_if_called(query: str, resort_names: list[str], top_k: int = 3) -> list:
+    def fail_if_called(query: str, resort_names: list[str], top_k: int = 3):
         raise AssertionError("Qdrant should not be called without OPENAI_API_KEY")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(vector_store, "query_resort_knowledge", fail_if_called)
+    monkeypatch.setattr(
+        vector_store,
+        "query_resort_knowledge_with_debug",
+        fail_if_called,
+    )
 
     response = client.post(
         "/advisor/parse",
@@ -774,6 +783,101 @@ def test_app_works_without_qdrant(monkeypatch: pytest.MonkeyPatch) -> None:
 
     assert response.status_code == 200
     assert response.json()["retrieval_debug"]["mode"] == "keyword_fallback"
+
+
+def test_qdrant_attempted_but_empty_reports_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(
+        vector_store,
+        "query_resort_knowledge_with_debug",
+        lambda query, resort_names, top_k: (
+            [],
+            {
+                "qdrant_attempted": True,
+                "qdrant_error": None,
+                "qdrant_result_count": 0,
+            },
+        ),
+    )
+    monkeypatch.setattr(
+        embedding_retriever,
+        "_build_searchable_chunks",
+        lambda: [
+            {
+                "resort_name": "Stowe",
+                "text": "Stowe trees",
+                "context": "Stowe: terrain_notes=trees",
+            }
+        ],
+    )
+    monkeypatch.setattr(
+        embedding_retriever,
+        "_call_openai_embeddings",
+        lambda api_key, model, texts: [[1.0], [0.9]],
+    )
+
+    _, debug = embedding_retriever.retrieve_embedding_context_with_debug(
+        "trees",
+        [{"name": "Stowe"}],
+    )
+
+    assert debug["mode"] == "embedding"
+    assert debug["qdrant_attempted"] is True
+    assert debug["qdrant_error"] is None
+    assert debug["qdrant_result_count"] == 0
+
+
+def test_qdrant_attempted_but_error_reports_sanitized_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        raise HTTPError(
+            request.full_url,
+            401,
+            "Unauthorized",
+            {},
+            BytesIO(b'{"status":"error"}'),
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("QDRANT_API_KEY", "secret-qdrant-key")
+    monkeypatch.setenv("QDRANT_URL", "https://secret-token@example.cloud")
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[1.0]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    _, debug = vector_store.query_resort_knowledge_with_debug(
+        "trees",
+        ["Stowe"],
+    )
+
+    assert debug["qdrant_attempted"] is True
+    assert debug["qdrant_error"]
+    assert "secret-qdrant-key" not in debug["qdrant_error"]
+    assert "secret-token" not in debug["qdrant_error"]
+    assert "example.cloud" in debug["qdrant_error"]
+
+
+def test_vector_store_status_works_without_qdrant_configured(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("QDRANT_URL", raising=False)
+
+    response = client.get("/admin/vector-store/status")
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "collection": "resort_knowledge",
+        "qdrant_configured": False,
+        "qdrant_url_host": "localhost:6333",
+        "collection_exists": None,
+        "point_count": None,
+    }
 
 
 def test_admin_reindex_knowledge_handles_missing_openai_api_key(
@@ -871,21 +975,28 @@ def test_qdrant_query_function_can_be_mocked_without_real_qdrant(
         query: str,
         recommended_resort_names: list[str],
         top_k: int = 3,
-    ) -> list[dict]:
+    ) -> tuple[list[dict], dict]:
         assert query == "trees"
         assert recommended_resort_names == ["Stowe"]
         assert top_k == 1
-        return [
+        return (
+            [
+                {
+                    "resort_name": "Stowe",
+                    "score": 0.88,
+                    "source": "resort_knowledge.json",
+                    "text": "Stowe: terrain_notes=Classic Vermont trees",
+                }
+            ],
             {
-                "resort_name": "Stowe",
-                "score": 0.88,
-                "source": "resort_knowledge.json",
-                "text": "Stowe: terrain_notes=Classic Vermont trees",
-            }
-        ]
+                "qdrant_attempted": True,
+                "qdrant_error": None,
+                "qdrant_result_count": 1,
+            },
+        )
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setattr(vector_store, "query_resort_knowledge", fake_query)
+    monkeypatch.setattr(vector_store, "query_resort_knowledge_with_debug", fake_query)
 
     context, debug = embedding_retriever.retrieve_embedding_context_with_debug(
         "trees",
@@ -895,6 +1006,8 @@ def test_qdrant_query_function_can_be_mocked_without_real_qdrant(
 
     assert "Classic Vermont trees" in context
     assert debug["mode"] == "qdrant"
+    assert debug["qdrant_attempted"] is True
+    assert debug["qdrant_result_count"] == 1
     assert debug["retrieved_chunks"][0]["score"] == 0.88
 
 

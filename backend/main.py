@@ -70,7 +70,7 @@ def advisor(request: RecommendRequest) -> AdvisorResponse:
 @app.post(
     "/advisor/parse",
     response_model=AdvisorParseResponse,
-    response_model_exclude_none=True,
+    response_model_exclude_unset=True,
 )
 def advisor_parse(request: AdvisorParseRequest) -> AdvisorParseResponse:
     parsed_request = parse_trip_message(request.message)
@@ -84,17 +84,26 @@ def advisor_parse(request: AdvisorParseRequest) -> AdvisorParseResponse:
             recommendations,
         )
 
-    return AdvisorParseResponse(
-        parsed_request=parsed_request,
-        recommendations=recommendations,
-        advisor_summary=advisor_summary,
-        retrieval_debug=retrieval_debug,
-    )
+    response = {
+        "parsed_request": parsed_request,
+        "recommendations": recommendations,
+        "advisor_summary": advisor_summary,
+    }
+
+    if request.debug:
+        response["retrieval_debug"] = retrieval_debug
+
+    return AdvisorParseResponse(**response)
 
 
 @app.post("/admin/reindex-knowledge")
 def reindex_knowledge() -> dict:
     return vector_store.upsert_resort_knowledge()
+
+
+@app.get("/admin/vector-store/status")
+def vector_store_status() -> dict:
+    return vector_store.get_vector_store_status()
 
 
 @app.get("/weather/{resort_name}", response_model=ResortWeatherResponse)

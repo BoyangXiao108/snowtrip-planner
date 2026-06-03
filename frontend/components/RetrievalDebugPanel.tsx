@@ -41,7 +41,25 @@ export function RetrievalDebugPanel({
               <dt className="font-medium text-slate-600">Top K</dt>
               <dd className="mt-1 text-slate-950">{retrievalDebug.top_k}</dd>
             </div>
+            <div>
+              <dt className="font-medium text-slate-600">Qdrant Attempted</dt>
+              <dd className="mt-1 text-slate-950">
+                {retrievalDebug.qdrant_attempted ? "Yes" : "No"}
+              </dd>
+            </div>
+            <div>
+              <dt className="font-medium text-slate-600">Qdrant Results</dt>
+              <dd className="mt-1 text-slate-950">
+                {retrievalDebug.qdrant_result_count ?? "n/a"}
+              </dd>
+            </div>
           </dl>
+
+          {retrievalDebug.qdrant_error ? (
+            <p className="rounded-md border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+              {retrievalDebug.qdrant_error}
+            </p>
+          ) : null}
 
           <div className="grid gap-3">
             {retrievalDebug.retrieved_chunks.map((chunk, index) => (
