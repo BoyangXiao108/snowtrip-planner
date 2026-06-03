@@ -1011,7 +1011,13 @@ def test_reindex_creates_collection_when_missing(
     qdrant_calls = []
 
     def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
-        qdrant_calls.append((request.full_url, request.get_method()))
+        qdrant_calls.append(
+            (
+                request.full_url,
+                request.get_method(),
+                json.loads(request.data.decode("utf-8")),
+            )
+        )
         return FakeQdrantResponse()
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
@@ -1026,8 +1032,17 @@ def test_reindex_creates_collection_when_missing(
     result = vector_store.upsert_resort_knowledge()
 
     assert result["status"] == "indexed"
-    assert ("http://localhost:6333/collections/resort_knowledge", "PUT") in qdrant_calls
-    assert any("points?wait=true" in url for url, _ in qdrant_calls)
+    assert any(
+        url == "http://localhost:6333/collections/resort_knowledge" and method == "PUT"
+        for url, method, _ in qdrant_calls
+    )
+    assert any(
+        url == "http://localhost:6333/collections/resort_knowledge/index"
+        and method == "PUT"
+        and body == {"field_name": "resort_name", "field_schema": "keyword"}
+        for url, method, body in qdrant_calls
+    )
+    assert any("points?wait=true" in url for url, _, _ in qdrant_calls)
 
 
 def test_create_collection_conflict_is_handled_gracefully(
@@ -1045,6 +1060,23 @@ def test_create_collection_conflict_is_handled_gracefully(
     monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
 
     vector_store._create_collection(vector_size=2)
+
+
+def test_create_resort_name_payload_index_conflict_is_handled_gracefully(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        raise HTTPError(
+            request.full_url,
+            409,
+            "Conflict",
+            {},
+            BytesIO(b'{"status":"error"}'),
+        )
+
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    vector_store._create_resort_name_payload_index()
 
 
 def test_reindex_upserts_vectors_after_collection_conflict(
@@ -1078,6 +1110,43 @@ def test_reindex_upserts_vectors_after_collection_conflict(
     result = vector_store.upsert_resort_knowledge()
 
     assert result["status"] == "indexed"
+    assert any("points?wait=true" in url for url, _ in qdrant_calls)
+
+
+def test_reindex_upserts_vectors_after_payload_index_conflict(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    qdrant_calls = []
+
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        qdrant_calls.append((request.full_url, request.get_method()))
+
+        if request.full_url.endswith("/collections/resort_knowledge/index"):
+            raise HTTPError(
+                request.full_url,
+                409,
+                "Conflict",
+                {},
+                BytesIO(b'{"status":"error"}'),
+            )
+
+        return FakeQdrantResponse()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(vector_store, "build_resort_chunks", _single_qdrant_chunk)
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    result = vector_store.upsert_resort_knowledge()
+
+    assert result["status"] == "indexed"
+    assert any(
+        url.endswith("/collections/resort_knowledge/index") for url, _ in qdrant_calls
+    )
     assert any("points?wait=true" in url for url, _ in qdrant_calls)
 
 

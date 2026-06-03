@@ -56,6 +56,7 @@ def upsert_resort_knowledge() -> dict:
         }
 
     _create_collection(vector_size=len(embeddings[0]))
+    _create_resort_name_payload_index()
     _upsert_points(chunks, embeddings)
 
     return {
@@ -176,6 +177,18 @@ def _create_collection(vector_size: int) -> None:
                 "size": vector_size,
                 "distance": "Cosine",
             }
+        },
+        ignore_conflict=True,
+    )
+
+
+def _create_resort_name_payload_index() -> None:
+    _qdrant_request(
+        f"/collections/{_qdrant_collection()}/index",
+        method="PUT",
+        payload={
+            "field_name": "resort_name",
+            "field_schema": "keyword",
         },
         ignore_conflict=True,
     )
