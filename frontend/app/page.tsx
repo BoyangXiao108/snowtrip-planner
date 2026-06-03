@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 
 type PassType = "Epic" | "Ikon" | "None";
 type Preference = "trees" | "park" | "groomers" | "powder";
+type InputMode = "structured" | "natural";
 
 type Weather = {
   temperature_f: number | null;
@@ -30,7 +31,19 @@ type AdvisorResponse = {
   advisor_summary?: string | null;
 };
 
+type ParsedAdvisorResponse = AdvisorResponse & {
+  parsed_request: StructuredRequest;
+};
+
 type TerrainWeights = Record<Preference, number>;
+
+type StructuredRequest = {
+  origin: string;
+  days: number;
+  budget: number;
+  pass_type: PassType;
+  terrain_weights: TerrainWeights;
+};
 
 const API_BASE_URL =
   process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:8000";
@@ -46,8 +59,11 @@ const DEFAULT_TERRAIN_WEIGHTS: TerrainWeights = {
   groomers: 2,
   park: 0,
 };
+const DEFAULT_NATURAL_LANGUAGE_MESSAGE =
+  "I have Epic Pass, leaving from Boston for 3 days, budget $1000, I like trees and powder.";
 
 export default function Home() {
+  const [mode, setMode] = useState<InputMode>("structured");
   const [origin, setOrigin] = useState("Boston");
   const [days, setDays] = useState("3");
   const [budget, setBudget] = useState("1000");
@@ -55,6 +71,10 @@ export default function Home() {
   const [terrainWeights, setTerrainWeights] = useState<TerrainWeights>(
     DEFAULT_TERRAIN_WEIGHTS,
   );
+  const [naturalLanguageMessage, setNaturalLanguageMessage] = useState(
+    DEFAULT_NATURAL_LANGUAGE_MESSAGE,
+  );
+  const [parsedRequest, setParsedRequest] = useState<StructuredRequest | null>(null);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [advisorSummary, setAdvisorSummary] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -65,38 +85,53 @@ export default function Home() {
     setIsLoading(true);
     setError(null);
     setAdvisorSummary(null);
+    setParsedRequest(null);
 
-    if (!Object.values(terrainWeights).some((weight) => weight > 0)) {
+    if (mode === "structured" && !Object.values(terrainWeights).some((weight) => weight > 0)) {
       setIsLoading(false);
       setError("Set at least one terrain weight above 0.");
       return;
     }
 
+    if (mode === "natural" && naturalLanguageMessage.trim().length === 0) {
+      setIsLoading(false);
+      setError("Enter a trip request.");
+      return;
+    }
+
     try {
-      const response = await fetch(`${API_BASE_URL}/advisor`, {
+      const response = await fetch(`${API_BASE_URL}/${mode === "structured" ? "advisor" : "advisor/parse"}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          origin,
-          days: Number(days),
-          budget: Number(budget),
-          pass_type: passType,
-          terrain_weights: terrainWeights,
-        }),
+        body: JSON.stringify(
+          mode === "structured"
+            ? {
+                origin,
+                days: Number(days),
+                budget: Number(budget),
+                pass_type: passType,
+                terrain_weights: terrainWeights,
+              }
+            : {
+                message: naturalLanguageMessage,
+              },
+        ),
       });
 
       if (!response.ok) {
         throw new Error("Unable to get recommendations. Check your inputs and try again.");
       }
 
-      const data = (await response.json()) as AdvisorResponse;
+      const data = (await response.json()) as AdvisorResponse | ParsedAdvisorResponse;
       setRecommendations(data.recommendations);
       setAdvisorSummary(data.advisor_summary?.trim() || null);
+      setParsedRequest("parsed_request" in data ? data.parsed_request : null);
     } catch (error) {
       setRecommendations([]);
       setAdvisorSummary(null);
+      setParsedRequest(null);
       setError(error instanceof Error ? error.message : "Something went wrong.");
     } finally {
       setIsLoading(false);
@@ -130,100 +165,88 @@ export default function Home() {
             className="h-fit rounded-lg border border-slate-200 bg-white p-5 shadow-sm"
           >
             <div className="space-y-5">
-              <Field label="Origin">
-                <input
-                  id="origin"
-                  className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                  value={origin}
-                  onChange={(event) => setOrigin(event.target.value)}
-                  required
-                />
-              </Field>
-
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
-                <Field label="Days">
-                  <input
-                    id="days"
-                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                    type="number"
-                    min="1"
-                    value={days}
-                    onChange={(event) => setDays(event.target.value)}
-                    required
-                  />
-                </Field>
-
-                <Field label="Budget">
-                  <input
-                    id="budget"
-                    className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                    type="number"
-                    min="1"
-                    value={budget}
-                    onChange={(event) => setBudget(event.target.value)}
-                    required
-                  />
-                </Field>
+              <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-100 p-1">
+                <ModeButton
+                  active={mode === "structured"}
+                  onClick={() => setMode("structured")}
+                >
+                  Structured Form
+                </ModeButton>
+                <ModeButton
+                  active={mode === "natural"}
+                  onClick={() => setMode("natural")}
+                >
+                  Natural Language
+                </ModeButton>
               </div>
 
-              <Field label="Pass Type">
-                <select
-                  id="pass-type"
-                  className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                  value={passType}
-                  onChange={(event) => setPassType(event.target.value as PassType)}
-                >
-                  <option value="Epic">Epic</option>
-                  <option value="Ikon">Ikon</option>
-                  <option value="None">None</option>
-                </select>
-              </Field>
+              {mode === "structured" ? (
+                <>
+                  <Field label="Origin">
+                    <input
+                      id="origin"
+                      className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                      value={origin}
+                      onChange={(event) => setOrigin(event.target.value)}
+                      required
+                    />
+                  </Field>
 
-              <fieldset>
-                <legend className="mb-2 text-sm font-medium text-slate-800">
-                  Terrain Weights
-                </legend>
-                <div className="space-y-3">
-                  {TERRAIN_OPTIONS.map((option) => (
-                    <div
-                      key={option.value}
-                      className="rounded-md border border-slate-300 bg-slate-50 p-3"
-                    >
-                      <div className="flex items-center justify-between gap-3">
-                        <label
-                          htmlFor={`terrain-${option.value}`}
-                          className="text-sm font-medium text-slate-900"
-                        >
-                          {option.label}
-                        </label>
-                        <input
-                          id={`terrain-${option.value}`}
-                          type="number"
-                          min="0"
-                          max="5"
-                          className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-sm font-semibold text-slate-950 outline-none ring-teal-600 focus:ring-2"
-                          value={terrainWeights[option.value]}
-                          onChange={(event) =>
-                            updateTerrainWeight(option.value, event.target.value)
-                          }
-                        />
-                      </div>
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-2">
+                    <Field label="Days">
                       <input
-                        aria-label={`${option.label} weight`}
-                        type="range"
-                        min="0"
-                        max="5"
-                        step="1"
-                        className="mt-2 w-full accent-teal-700"
-                        value={terrainWeights[option.value]}
-                        onChange={(event) =>
-                          updateTerrainWeight(option.value, event.target.value)
-                        }
+                        id="days"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                        type="number"
+                        min="1"
+                        value={days}
+                        onChange={(event) => setDays(event.target.value)}
+                        required
                       />
-                    </div>
-                  ))}
-                </div>
-              </fieldset>
+                    </Field>
+
+                    <Field label="Budget">
+                      <input
+                        id="budget"
+                        className="w-full rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                        type="number"
+                        min="1"
+                        value={budget}
+                        onChange={(event) => setBudget(event.target.value)}
+                        required
+                      />
+                    </Field>
+                  </div>
+
+                  <Field label="Pass Type">
+                    <select
+                      id="pass-type"
+                      className="w-full rounded-md border border-slate-300 bg-white px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                      value={passType}
+                      onChange={(event) => setPassType(event.target.value as PassType)}
+                    >
+                      <option value="Epic">Epic</option>
+                      <option value="Ikon">Ikon</option>
+                      <option value="None">None</option>
+                    </select>
+                  </Field>
+
+                  <TerrainWeightControls
+                    terrainWeights={terrainWeights}
+                    onChange={updateTerrainWeight}
+                  />
+                </>
+              ) : (
+                <Field label="Trip Request">
+                  <textarea
+                    className="min-h-40 w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                    placeholder={DEFAULT_NATURAL_LANGUAGE_MESSAGE}
+                    value={naturalLanguageMessage}
+                    onChange={(event) => setNaturalLanguageMessage(event.target.value)}
+                    required
+                  />
+                </Field>
+              )}
 
               <button
                 type="submit"
@@ -264,6 +287,8 @@ export default function Home() {
               <AdvisorSummary summary={advisorSummary} />
             ) : null}
 
+            {parsedRequest ? <ParsedRequestPanel parsedRequest={parsedRequest} /> : null}
+
             <div className="grid gap-4">
               {recommendations.map((recommendation, index) => (
                 <RecommendationCard
@@ -289,6 +314,113 @@ function AdvisorSummary({ summary }: { summary: string | null }) {
           "Advisor summary is unavailable, but your ranked resort recommendations are ready below."}
       </p>
     </section>
+  );
+}
+
+function ParsedRequestPanel({
+  parsedRequest,
+}: {
+  parsedRequest: StructuredRequest;
+}) {
+  return (
+    <section className="mb-4 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+      <h2 className="text-sm font-semibold uppercase text-slate-500">
+        Parsed request
+      </h2>
+      <dl className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <Metric label="Origin" value={parsedRequest.origin} />
+        <Metric label="Days" value={`${parsedRequest.days}`} />
+        <Metric label="Budget" value={`$${parsedRequest.budget}`} />
+        <Metric label="Pass" value={parsedRequest.pass_type} />
+      </dl>
+      <div className="mt-3 rounded-md bg-slate-50 p-3">
+        <p className="text-xs font-medium uppercase text-slate-500">
+          Terrain weights
+        </p>
+        <p className="mt-1 text-sm font-semibold text-slate-950">
+          Trees {parsedRequest.terrain_weights.trees} · Powder{" "}
+          {parsedRequest.terrain_weights.powder} · Groomers{" "}
+          {parsedRequest.terrain_weights.groomers} · Park{" "}
+          {parsedRequest.terrain_weights.park}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ModeButton({
+  active,
+  children,
+  onClick,
+}: {
+  active: boolean;
+  children: React.ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={
+        active
+          ? "rounded-md bg-white px-3 py-2 text-sm font-semibold text-teal-800 shadow-sm"
+          : "rounded-md px-3 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950"
+      }
+      onClick={onClick}
+    >
+      {children}
+    </button>
+  );
+}
+
+function TerrainWeightControls({
+  terrainWeights,
+  onChange,
+}: {
+  terrainWeights: TerrainWeights;
+  onChange: (preference: Preference, value: string) => void;
+}) {
+  return (
+    <fieldset>
+      <legend className="mb-2 text-sm font-medium text-slate-800">
+        Terrain Weights
+      </legend>
+      <div className="space-y-3">
+        {TERRAIN_OPTIONS.map((option) => (
+          <div
+            key={option.value}
+            className="rounded-md border border-slate-300 bg-slate-50 p-3"
+          >
+            <div className="flex items-center justify-between gap-3">
+              <label
+                htmlFor={`terrain-${option.value}`}
+                className="text-sm font-medium text-slate-900"
+              >
+                {option.label}
+              </label>
+              <input
+                id={`terrain-${option.value}`}
+                type="number"
+                min="0"
+                max="5"
+                className="w-16 rounded-md border border-slate-300 bg-white px-2 py-1.5 text-center text-sm font-semibold text-slate-950 outline-none ring-teal-600 focus:ring-2"
+                value={terrainWeights[option.value]}
+                onChange={(event) => onChange(option.value, event.target.value)}
+              />
+            </div>
+            <input
+              aria-label={`${option.label} weight`}
+              type="range"
+              min="0"
+              max="5"
+              step="1"
+              className="mt-2 w-full accent-teal-700"
+              value={terrainWeights[option.value]}
+              onChange={(event) => onChange(option.value, event.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

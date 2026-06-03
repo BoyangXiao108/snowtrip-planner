@@ -134,7 +134,7 @@ npm run dev
 
 The frontend will run at `http://localhost:3000`.
 
-The frontend submits the planner form to `POST /advisor`, displays the returned `advisor_summary`, and then renders the ranked recommendation cards.
+The frontend supports two modes. Structured Form submits to `POST /advisor`. Natural Language submits a textarea request to `POST /advisor/parse`, displays the parsed request, shows the returned `advisor_summary`, and then renders the ranked recommendation cards.
 
 ## Test With curl
 
