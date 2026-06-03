@@ -120,6 +120,7 @@ def weather_status(resort: str) -> dict:
             "request_url": None,
             "weather_fetch_success": False,
             "weather_error": "resort not found",
+            "cached_result_used": False,
             "weather": None,
         }
 

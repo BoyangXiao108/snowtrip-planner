@@ -55,8 +55,10 @@ def _single_qdrant_chunk() -> list[dict]:
 @pytest.fixture(autouse=True)
 def clear_weather_cache() -> None:
     weather.WEATHER_CACHE.clear()
+    weather.WEATHER_FAILURE_CACHE.clear()
     yield
     weather.WEATHER_CACHE.clear()
+    weather.WEATHER_FAILURE_CACHE.clear()
 
 
 @pytest.fixture(autouse=True)
@@ -248,6 +250,7 @@ def test_admin_weather_status_success() -> None:
     assert "longitude=-72.7818" in data["request_url"]
     assert data["weather_fetch_success"] is True
     assert data["weather_error"] is None
+    assert data["cached_result_used"] is False
     assert data["weather"]["snowfall_inches_next_3_days"] == 7.7
 
 
@@ -270,6 +273,7 @@ def test_admin_weather_status_failure(monkeypatch: pytest.MonkeyPatch) -> None:
     assert data["resort_name"] == "Stowe"
     assert data["weather_fetch_success"] is False
     assert data["weather_error"] == "TimeoutError: Open-Meteo timed out"
+    assert data["cached_result_used"] is False
     assert data["weather"] is None
     assert data["request_url"].startswith("https://api.open-meteo.com/v1/forecast")
 
@@ -287,6 +291,7 @@ def test_admin_weather_status_unknown_resort() -> None:
         "request_url": None,
         "weather_fetch_success": False,
         "weather_error": "resort not found",
+        "cached_result_used": False,
         "weather": None,
     }
 
@@ -446,6 +451,149 @@ def test_weather_expired_cache_refetches(monkeypatch: pytest.MonkeyPatch) -> Non
 
     first_forecast = weather.get_weather_for_resort(resort)
     current_time += weather.WEATHER_CACHE_TTL_SECONDS + 1
+    second_forecast = weather.get_weather_for_resort(resort)
+
+    assert call_count == 2
+    assert second_forecast["temperature_f"] != first_forecast["temperature_f"]
+
+
+def test_weather_429_uses_cached_weather_if_available(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    call_count = 0
+
+    class CacheResponse:
+        def __enter__(self) -> "CacheResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 30.0,
+                        "wind_speed_10m": 8.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.0, 1.0, 1.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> CacheResponse:
+        nonlocal call_count
+        call_count += 1
+
+        if call_count == 1:
+            return CacheResponse()
+
+        raise HTTPError(url, 429, "Too Many Requests", hdrs=None, fp=BytesIO())
+
+    current_time = 1000.0
+
+    def fake_time() -> float:
+        return current_time
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+    monkeypatch.setattr(weather.time, "time", fake_time)
+
+    first_forecast = weather.get_weather_for_resort(resort)
+    current_time += weather.WEATHER_CACHE_TTL_SECONDS + 1
+    second_result = weather.get_weather_result_for_resort(resort)
+
+    assert call_count == 2
+    assert second_result["weather"] == first_forecast
+    assert second_result["weather_error"] == "HTTP 429 rate limited"
+    assert second_result["cached_result_used"] is True
+
+
+def test_weather_429_with_no_cache_returns_failure_cleanly(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    call_count = 0
+
+    def fake_urlopen(url: str, timeout: int) -> object:
+        nonlocal call_count
+        call_count += 1
+        raise HTTPError(url, 429, "Too Many Requests", hdrs=None, fp=BytesIO())
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+
+    result = weather.get_weather_result_for_resort(resort)
+
+    assert call_count == 1
+    assert result["weather"] is None
+    assert result["weather_error"] == "HTTP 429 rate limited"
+    assert result["cached_result_used"] is False
+
+
+def test_weather_failure_cache_prevents_repeated_immediate_calls(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    call_count = 0
+
+    def fake_urlopen(url: str, timeout: int) -> object:
+        nonlocal call_count
+        call_count += 1
+        raise TimeoutError("Open-Meteo timed out")
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+
+    first_result = weather.get_weather_result_for_resort(resort)
+    second_result = weather.get_weather_result_for_resort(resort)
+
+    assert call_count == 1
+    assert first_result["weather"] is None
+    assert second_result["weather"] is None
+    assert second_result["weather_error"] == "TimeoutError: Open-Meteo timed out"
+    assert second_result["fetch_attempted"] is False
+
+
+def test_weather_cache_ttl_env_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_count = 0
+
+    class CacheResponse:
+        def __enter__(self) -> "CacheResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 30.0 + call_count,
+                        "wind_speed_10m": 8.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.0, 1.0, 1.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> CacheResponse:
+        nonlocal call_count
+        call_count += 1
+        return CacheResponse()
+
+    current_time = 1000.0
+
+    def fake_time() -> float:
+        return current_time
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setenv("WEATHER_CACHE_TTL_SECONDS", "2")
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+    monkeypatch.setattr(weather.time, "time", fake_time)
+
+    first_forecast = weather.get_weather_for_resort(resort)
+    current_time += 3
     second_forecast = weather.get_weather_for_resort(resort)
 
     assert call_count == 2

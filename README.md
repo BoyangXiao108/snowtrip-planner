@@ -169,6 +169,8 @@ OPENAI_EMBEDDING_MODEL=text-embedding-3-small
 QDRANT_URL=optional, local or Qdrant Cloud URL
 QDRANT_API_KEY=optional, required for Qdrant Cloud
 QDRANT_COLLECTION=resort_knowledge
+WEATHER_CACHE_TTL_SECONDS=3600
+WEATHER_FAILURE_CACHE_TTL_SECONDS=300
 CORS_ORIGINS=https://your-vercel-app.vercel.app
 ```
 
@@ -195,6 +197,8 @@ Deploy the backend as a Render Web Service:
    - `QDRANT_URL`
    - `QDRANT_API_KEY`
    - `QDRANT_COLLECTION`
+   - `WEATHER_CACHE_TTL_SECONDS=3600`
+   - `WEATHER_FAILURE_CACHE_TTL_SECONDS=300`
    - `CORS_ORIGINS`
 6. After deploy, verify:
 
