@@ -8,21 +8,27 @@ from schemas import ResortRecommendation
 DEFAULT_OPENAI_MODEL = "gpt-4.1-mini"
 
 
-def generate_advisor_summary(recommendations: list[ResortRecommendation]) -> str:
+def generate_advisor_summary(
+    recommendations: list[ResortRecommendation],
+    user_message: str | None = None,
+) -> str:
     api_key = os.getenv("OPENAI_API_KEY")
 
     if not api_key:
-        return fallback_summary(recommendations)
+        return fallback_summary(recommendations, user_message)
 
     model = os.getenv("OPENAI_MODEL", DEFAULT_OPENAI_MODEL)
 
     try:
-        return _call_openai_advisor(api_key, model, recommendations)
+        return _call_openai_advisor(api_key, model, recommendations, user_message)
     except Exception:
-        return fallback_summary(recommendations)
+        return fallback_summary(recommendations, user_message)
 
 
-def build_advisor_context(recommendations: list[ResortRecommendation]) -> str:
+def build_advisor_context(
+    recommendations: list[ResortRecommendation],
+    user_message: str | None = None,
+) -> str:
     context_lines = []
 
     for index, recommendation in enumerate(recommendations, start=1):
@@ -46,9 +52,7 @@ def build_advisor_context(recommendations: list[ResortRecommendation]) -> str:
         )
 
     recommendation_context = "\n".join(context_lines)
-    knowledge_context = knowledge.build_knowledge_context_for_recommendations(
-        recommendations
-    )
+    knowledge_context = knowledge.retrieve_knowledge_context(recommendations, user_message)
 
     if not knowledge_context:
         return recommendation_context
@@ -60,13 +64,16 @@ def build_advisor_context(recommendations: list[ResortRecommendation]) -> str:
     )
 
 
-def fallback_summary(recommendations: list[ResortRecommendation]) -> str:
+def fallback_summary(
+    recommendations: list[ResortRecommendation],
+    user_message: str | None = None,
+) -> str:
     if not recommendations:
         return "No recommendations are available for this trip."
 
     best = recommendations[0]
     alternatives = recommendations[1:]
-    knowledge_note = _knowledge_note(best)
+    knowledge_note = _knowledge_note(best, user_message)
 
     return (
         f"Best pick: {best.name} in {best.state}. It has the top score "
@@ -81,13 +88,14 @@ def _call_openai_advisor(
     api_key: str,
     model: str,
     recommendations: list[ResortRecommendation],
+    user_message: str | None = None,
 ) -> str:
     prompt = (
         "You are a ski trip advisor. Using only the recommendation data below, "
         "write a concise trip summary. Recommend the best option, explain key "
         "tradeoffs, and mention budget, terrain fit, travel distance, and snow "
         "forecast when available. Do not add facts that are not in the data.\n\n"
-        f"{build_advisor_context(recommendations)}"
+        f"{build_advisor_context(recommendations, user_message)}"
     )
 
     return call_openai_responses(api_key, model, prompt, max_tokens=220)
@@ -131,10 +139,16 @@ def _weather_text(recommendation: ResortRecommendation) -> str:
     )
 
 
-def _knowledge_note(recommendation: ResortRecommendation) -> str:
+def _knowledge_note(
+    recommendation: ResortRecommendation,
+    user_message: str | None = None,
+) -> str:
     resort_knowledge = knowledge.get_knowledge_for_resort(recommendation.name)
 
     if not resort_knowledge:
         return ""
 
-    return f"Useful note: {resort_knowledge['trip_tips']} "
+    field = knowledge.prioritized_knowledge_fields(user_message)[0]
+    readable_field = field.replace("_", " ")
+
+    return f"Useful note: {readable_field}: {resort_knowledge[field]} "

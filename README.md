@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V6.3 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, and natural-language trip parsing.
+Backend V6.7 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and lightweight local knowledge retrieval.
 
 ## Features
 
@@ -12,6 +12,7 @@ Backend V6.3 for a simple ski resort recommendation API with weighted terrain sc
 - AI advisor summary
 - Natural-language trip parsing
 - Local resort knowledge base
+- Lightweight query-aware knowledge retrieval
 - Docker
 - GitHub Actions CI
 
@@ -88,7 +89,9 @@ Without `OPENAI_API_KEY`, parsing uses deterministic keyword rules and safe defa
 
 The backend includes a structured local knowledge file at `backend/data/resort_knowledge.json`. Each resort has terrain notes, best-use cases, avoid-if guidance, trip tips, and lodging notes.
 
-This knowledge is used only to enrich advisor explanations. It does not override calculated recommendation scores. The structure prepares the project for future RAG work, but this version does not add embeddings, a vector database, document upload, or scraping.
+Advisor summaries retrieve knowledge for the recommended resorts. `POST /advisor` uses the recommended resorts only. `POST /advisor/parse` also uses the original user message to prioritize matching notes for keywords like trees, powder, park, groomers, budget, lodging, beginner, advanced, crowds, and long drive.
+
+This retrieval is deterministic and lightweight. Knowledge is used only to enrich advisor explanations and does not override calculated recommendation scores. The structure prepares the project for future RAG work, but this version does not add embeddings, a vector database, document upload, or scraping.
 
 ## Weather
 

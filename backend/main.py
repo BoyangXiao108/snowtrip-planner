@@ -14,7 +14,7 @@ from schemas import (
 )
 
 
-app = FastAPI(title="Snowtrip Planner API", version="6.3.0")
+app = FastAPI(title="Snowtrip Planner API", version="6.7.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -55,7 +55,7 @@ def advisor(request: RecommendRequest) -> AdvisorResponse:
 def advisor_parse(request: AdvisorParseRequest) -> AdvisorParseResponse:
     parsed_request = parse_trip_message(request.message)
     recommendations = recommend_resorts(parsed_request)
-    advisor_summary = generate_advisor_summary(recommendations)
+    advisor_summary = generate_advisor_summary(recommendations, request.message)
 
     return AdvisorParseResponse(
         parsed_request=parsed_request,

@@ -429,6 +429,33 @@ def test_invalid_resort_knowledge_lookup_returns_none() -> None:
     assert knowledge.get_knowledge_for_resort("NotAResort") is None
 
 
+def test_retrieve_knowledge_context_returns_recommended_resort_knowledge() -> None:
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = knowledge.retrieve_knowledge_context(recommendations)
+
+    assert "Stowe:" in context
+    assert "terrain_notes=" in context
+    assert "lodging_notes=" in context
+
+
+def test_retrieve_knowledge_context_uses_user_message_keywords() -> None:
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = knowledge.retrieve_knowledge_context(
+        recommendations,
+        "I care about budget lodging and avoiding crowds.",
+    )
+    stowe_line = next(line for line in context.splitlines() if line.startswith("Stowe:"))
+
+    assert stowe_line.index("lodging_notes=") < stowe_line.index("terrain_notes=")
+    assert stowe_line.index("trip_tips=") < stowe_line.index("terrain_notes=")
+
+
 def test_advisor_fallback_includes_knowledge_context(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -438,6 +465,26 @@ def test_advisor_fallback_includes_knowledge_context(
     advisor_summary_text = response.json()["advisor_summary"]
 
     assert "Useful note:" in advisor_summary_text
+
+
+def test_advisor_parse_includes_query_aware_knowledge_context(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": (
+                "I have Epic Pass from Boston for 3 days with budget $1000, "
+                "and lodging value matters."
+            )
+        },
+    )
+    advisor_summary_text = response.json()["advisor_summary"]
+
+    assert response.status_code == 200
+    assert "Useful note: lodging notes:" in advisor_summary_text
 
 
 def test_advisor_parse_epic_boston_days_budget_trees_powder(
