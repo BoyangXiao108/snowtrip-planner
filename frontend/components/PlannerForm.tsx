@@ -1,23 +1,17 @@
 import type { FormEvent, ReactNode } from "react";
 
 import { TERRAIN_OPTIONS } from "../constants";
-import type { InputMode, PassType, Preference, TerrainWeights } from "../types";
-import { NaturalLanguageInput } from "./NaturalLanguageInput";
+import type { PassType, Preference, TerrainWeights } from "../types";
 
 export function PlannerForm({
   budget,
   days,
-  error,
   isLoading,
-  mode,
-  naturalLanguageMessage,
   origin,
   passType,
   terrainWeights,
   onBudgetChange,
   onDaysChange,
-  onModeChange,
-  onNaturalLanguageMessageChange,
   onOriginChange,
   onPassTypeChange,
   onSubmit,
@@ -25,17 +19,12 @@ export function PlannerForm({
 }: {
   budget: string;
   days: string;
-  error: string | null;
   isLoading: boolean;
-  mode: InputMode;
-  naturalLanguageMessage: string;
   origin: string;
   passType: PassType;
   terrainWeights: TerrainWeights;
   onBudgetChange: (value: string) => void;
   onDaysChange: (value: string) => void;
-  onModeChange: (mode: InputMode) => void;
-  onNaturalLanguageMessageChange: (value: string) => void;
   onOriginChange: (value: string) => void;
   onPassTypeChange: (value: PassType) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
@@ -44,62 +33,38 @@ export function PlannerForm({
   return (
     <form
       onSubmit={onSubmit}
-      className="h-fit rounded-2xl border border-white/70 bg-white/85 p-5 shadow-sm shadow-slate-200/80 backdrop-blur sm:p-6"
+      className="rounded-[1.5rem] border border-white/80 bg-white/80 p-5 shadow-sm shadow-slate-200/70 backdrop-blur sm:p-6"
     >
       <div className="space-y-6">
         <div>
-          <p className="text-sm font-semibold text-slate-950">Plan your trip</p>
+          <p className="text-lg font-semibold tracking-tight text-slate-950">
+            Structured Search
+          </p>
           <p className="mt-1 text-sm leading-6 text-slate-500">
-            Start with natural language, or switch to structured controls.
+            Prefer exact inputs? Tune the same recommendation engine manually.
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-200 bg-slate-50 p-1">
-          <ModeButton active={mode === "natural"} onClick={() => onModeChange("natural")}>
-            Natural Language
-          </ModeButton>
-          <ModeButton active={mode === "structured"} onClick={() => onModeChange("structured")}>
-            Structured Form
-          </ModeButton>
-        </div>
-
-        {mode === "structured" ? (
-          <StructuredFields
-            budget={budget}
-            days={days}
-            origin={origin}
-            passType={passType}
-            terrainWeights={terrainWeights}
-            onBudgetChange={onBudgetChange}
-            onDaysChange={onDaysChange}
-            onOriginChange={onOriginChange}
-            onPassTypeChange={onPassTypeChange}
-            onTerrainWeightChange={onTerrainWeightChange}
-          />
-        ) : (
-          <NaturalLanguageInput
-            value={naturalLanguageMessage}
-            onChange={onNaturalLanguageMessageChange}
-          />
-        )}
+        <StructuredFields
+          budget={budget}
+          days={days}
+          origin={origin}
+          passType={passType}
+          terrainWeights={terrainWeights}
+          onBudgetChange={onBudgetChange}
+          onDaysChange={onDaysChange}
+          onOriginChange={onOriginChange}
+          onPassTypeChange={onPassTypeChange}
+          onTerrainWeightChange={onTerrainWeightChange}
+        />
 
         <button
           type="submit"
           disabled={isLoading}
-          className="w-full rounded-xl bg-teal-700 px-4 py-3 font-semibold text-white shadow-sm shadow-teal-900/10 transition hover:bg-teal-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+          className="w-full rounded-2xl border border-teal-700 bg-white px-4 py-3 font-semibold text-teal-800 shadow-sm transition hover:bg-teal-50 disabled:cursor-not-allowed disabled:border-slate-300 disabled:text-slate-400"
         >
-          {isLoading ? "Building your trip advice..." : "Plan my trip"}
+          {isLoading ? "Building your trip advice..." : "Search with structured inputs"}
         </button>
-        {isLoading ? (
-          <p className="text-center text-sm text-slate-600">
-            Building your trip advice...
-          </p>
-        ) : null}
-        {error ? (
-          <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-            {error}
-          </p>
-        ) : null}
       </div>
     </form>
   );
@@ -184,30 +149,6 @@ function StructuredFields({
         onChange={onTerrainWeightChange}
       />
     </>
-  );
-}
-
-function ModeButton({
-  active,
-  children,
-  onClick,
-}: {
-  active: boolean;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={
-        active
-          ? "rounded-lg bg-white px-3 py-2 text-sm font-semibold text-teal-800 shadow-sm"
-          : "rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition hover:text-slate-950"
-      }
-      onClick={onClick}
-    >
-      {children}
-    </button>
   );
 }
 

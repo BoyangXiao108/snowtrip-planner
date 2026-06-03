@@ -9,7 +9,7 @@ export function RecommendationCard({
   rank: number;
 }) {
   return (
-    <article className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-sm shadow-slate-200/70">
+    <article className="flex h-full flex-col rounded-[1.5rem] border border-white/80 bg-white/90 p-5 shadow-sm shadow-slate-200/70">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-700 text-sm font-semibold text-white shadow-sm shadow-teal-900/10">
@@ -26,7 +26,7 @@ export function RecommendationCard({
         </div>
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2">
         <Metric
           label="Score"
           value={recommendation.total_score.toFixed(1)}
@@ -49,12 +49,12 @@ export function RecommendationCard({
         />
       </dl>
 
-      <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">
+      <p className="mt-4 flex-1 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">
         {recommendation.reason}
       </p>
 
       {recommendation.weather ? (
-        <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2">
           <Metric
             label="Temperature"
             value={formatWeather(recommendation.weather.temperature_f, "F")}

@@ -2,7 +2,7 @@ export function AdvisorSummary({ summary }: { summary: string | null }) {
   const lines = parseSummary(summary);
 
   return (
-    <section className="mb-4 rounded-2xl border border-teal-100 bg-teal-50/80 p-5 shadow-sm shadow-teal-900/5">
+    <section className="mx-auto max-w-5xl rounded-[1.5rem] border border-teal-100 bg-teal-50/80 p-5 shadow-sm shadow-teal-900/5 sm:p-6">
       <div>
         <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
           Trip advice
@@ -13,7 +13,7 @@ export function AdvisorSummary({ summary }: { summary: string | null }) {
       </div>
 
       {lines.length > 0 ? (
-        <dl className="mt-4 grid gap-3">
+        <dl className="mt-5 grid gap-3 md:grid-cols-2">
           {lines.map((line) => (
             <div
               key={line.label}

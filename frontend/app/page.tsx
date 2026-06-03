@@ -3,6 +3,7 @@
 import { FormEvent, useState } from "react";
 
 import { AdvisorSummary } from "../components/AdvisorSummary";
+import { NaturalSearchPanel } from "../components/NaturalSearchPanel";
 import { ParsedRequestPanel } from "../components/ParsedRequestPanel";
 import { PlannerForm } from "../components/PlannerForm";
 import { RecommendationCard } from "../components/RecommendationCard";
@@ -14,7 +15,6 @@ import {
 } from "../constants";
 import type {
   AdvisorResponse,
-  InputMode,
   ParsedAdvisorResponse,
   PassType,
   Preference,
@@ -25,7 +25,6 @@ import type {
 } from "../types";
 
 export default function Home() {
-  const [mode, setMode] = useState<InputMode>("natural");
   const [origin, setOrigin] = useState("Boston");
   const [days, setDays] = useState("3");
   const [budget, setBudget] = useState("1000");
@@ -44,8 +43,29 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleNaturalSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (naturalLanguageMessage.trim().length === 0) {
+      setError("Enter a trip request.");
+      return;
+    }
+
+    await submitRequest("natural");
+  }
+
+  async function handleStructuredSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!hasTerrainWeight(terrainWeights)) {
+      setError("Set at least one terrain weight above 0.");
+      return;
+    }
+
+    await submitRequest("structured");
+  }
+
+  async function submitRequest(requestType: "natural" | "structured") {
     setIsLoading(true);
     setError(null);
     setAdvisorSummary(null);
@@ -53,27 +73,15 @@ export default function Home() {
     setRetrievalDebug(null);
     setShowRetrievalDetails(false);
 
-    if (mode === "structured" && !hasTerrainWeight(terrainWeights)) {
-      setIsLoading(false);
-      setError("Set at least one terrain weight above 0.");
-      return;
-    }
-
-    if (mode === "natural" && naturalLanguageMessage.trim().length === 0) {
-      setIsLoading(false);
-      setError("Enter a trip request.");
-      return;
-    }
-
     try {
       const response = await fetch(
-        `${API_BASE_URL}/${mode === "structured" ? "advisor" : "advisor/parse"}`,
+        `${API_BASE_URL}/${requestType === "structured" ? "advisor" : "advisor/parse"}`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
           },
-          body: JSON.stringify(buildRequestBody()),
+          body: JSON.stringify(buildRequestBody(requestType)),
         },
       );
 
@@ -100,8 +108,8 @@ export default function Home() {
     }
   }
 
-  function buildRequestBody() {
-    if (mode === "natural") {
+  function buildRequestBody(requestType: "natural" | "structured") {
+    if (requestType === "natural") {
       return { message: naturalLanguageMessage, debug: true };
     }
 
@@ -124,14 +132,14 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e8f3f1,transparent_36%),linear-gradient(180deg,#f8fbfb_0%,#eef4f3_100%)] px-4 py-8 sm:px-6 lg:px-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top,#dfeeed,transparent_34%),linear-gradient(180deg,#f8fbfb_0%,#eef4f3_100%)] px-4 py-10 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl">
-        <header className="mx-auto mb-10 max-w-3xl text-center">
+        <header className="mx-auto max-w-4xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
             Snowtrip Planner
           </p>
-          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-            Find the right mountain for your next ski trip.
+          <h1 className="mt-4 text-4xl font-semibold tracking-tight text-slate-950 sm:text-6xl">
+            Plan a better ski trip in one sentence.
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
             Plan a ski trip using your pass, budget, terrain preferences, weather,
@@ -139,58 +147,69 @@ export default function Home() {
           </p>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[minmax(360px,440px)_1fr] lg:items-start">
+        <section className="mt-10">
+          <NaturalSearchPanel
+            error={error}
+            isLoading={isLoading}
+            value={naturalLanguageMessage}
+            onChange={setNaturalLanguageMessage}
+            onSubmit={handleNaturalSubmit}
+          />
+        </section>
+
+        <section aria-live="polite" className="mt-10">
+          {recommendations.length === 0 && !error ? <EmptyState /> : null}
+
+          {recommendations.length > 0 ? (
+            <div className="space-y-6">
+              <AdvisorSummary summary={advisorSummary} />
+
+              {parsedRequest ? (
+                <div className="mx-auto max-w-5xl">
+                  <ParsedRequestPanel parsedRequest={parsedRequest} />
+                </div>
+              ) : null}
+
+              <div className="grid gap-5 lg:grid-cols-3">
+                {recommendations.map((recommendation, index) => (
+                  <RecommendationCard
+                    key={`${recommendation.name}-${recommendation.state}`}
+                    recommendation={recommendation}
+                    rank={index + 1}
+                  />
+                ))}
+              </div>
+
+              {retrievalDebug ? (
+                <RetrievalDebugPanel
+                  isVisible={showRetrievalDetails}
+                  retrievalDebug={retrievalDebug}
+                  onToggle={() =>
+                    setShowRetrievalDetails((currentValue) => !currentValue)
+                  }
+                />
+              ) : null}
+            </div>
+          ) : null}
+        </section>
+
+        <section className="mt-10 grid gap-6 lg:grid-cols-[1fr_minmax(360px,460px)_1fr]">
+          <div className="hidden lg:block" />
           <PlannerForm
             budget={budget}
             days={days}
-            error={error}
             isLoading={isLoading}
-            mode={mode}
-            naturalLanguageMessage={naturalLanguageMessage}
             origin={origin}
             passType={passType}
             terrainWeights={terrainWeights}
             onBudgetChange={setBudget}
             onDaysChange={setDays}
-            onModeChange={setMode}
-            onNaturalLanguageMessageChange={setNaturalLanguageMessage}
             onOriginChange={setOrigin}
             onPassTypeChange={setPassType}
-            onSubmit={handleSubmit}
+            onSubmit={handleStructuredSubmit}
             onTerrainWeightChange={updateTerrainWeight}
           />
-
-          <section aria-live="polite" className="min-w-0">
-            {recommendations.length === 0 && !error ? (
-              <EmptyState />
-            ) : null}
-
-            {recommendations.length > 0 ? (
-              <AdvisorSummary summary={advisorSummary} />
-            ) : null}
-
-            {parsedRequest ? <ParsedRequestPanel parsedRequest={parsedRequest} /> : null}
-
-            {retrievalDebug ? (
-              <RetrievalDebugPanel
-                isVisible={showRetrievalDetails}
-                retrievalDebug={retrievalDebug}
-                onToggle={() =>
-                  setShowRetrievalDetails((currentValue) => !currentValue)
-                }
-              />
-            ) : null}
-
-            <div className="grid gap-4">
-              {recommendations.map((recommendation, index) => (
-                <RecommendationCard
-                  key={`${recommendation.name}-${recommendation.state}`}
-                  recommendation={recommendation}
-                  rank={index + 1}
-                />
-              ))}
-            </div>
-          </section>
+          <div className="hidden lg:block" />
         </section>
       </div>
     </main>
@@ -199,11 +218,11 @@ export default function Home() {
 
 function EmptyState() {
   return (
-    <div className="rounded-2xl border border-white/70 bg-white/80 p-8 shadow-sm shadow-slate-200/70 backdrop-blur">
+    <div className="mx-auto max-w-4xl rounded-[1.5rem] border border-dashed border-slate-300 bg-white/50 p-8 text-center">
       <h2 className="text-xl font-semibold tracking-tight text-slate-950">
-        Start with one sentence.
+        Your trip plan will appear here.
       </h2>
-      <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600">
         Describe where you are leaving from, how long you are going, your budget,
         your pass, and what kind of terrain you want. Your trip advice and ranked
         recommendations will appear here.
