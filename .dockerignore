@@ -1,0 +1,13 @@
+.git
+.pytest_cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.DS_Store
+backend/.pytest_cache
+backend/.venv
+backend/__pycache__
+backend/tests
+backend/requirements.txt
