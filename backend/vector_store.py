@@ -211,7 +211,7 @@ def _search_qdrant(
 ) -> list[dict]:
     recommended_filter = _recommended_resort_filter(recommended_resort_names or [])
     payload = {
-        "vector": query_embedding,
+        "query": query_embedding,
         "limit": top_k,
         "with_payload": True,
     }
@@ -220,12 +220,17 @@ def _search_qdrant(
         payload["filter"] = recommended_filter
 
     response = _qdrant_request(
-        f"/collections/{_qdrant_collection()}/points/search",
+        f"/collections/{_qdrant_collection()}/points/query",
         method="POST",
         payload=payload,
     )
 
-    return response.get("result", [])
+    result = response.get("result", [])
+
+    if isinstance(result, dict):
+        return result.get("points", [])
+
+    return result
 
 
 def _format_qdrant_results(results: list[dict]) -> list[dict]:
@@ -300,8 +305,12 @@ def _qdrant_request(
         if ignore_conflict and exc.code == 409:
             return {"status": "ok", "result": "collection already exists"}
 
+        response_body = _read_error_body(exc)
         raise RuntimeError(
-            f"Qdrant request failed for host {_qdrant_url_host()} with status {exc.code}"
+            (
+                f"Qdrant request failed for host {_qdrant_url_host()} "
+                f"with status {exc.code}: {response_body}"
+            )
         ) from exc
     except (URLError, TimeoutError) as exc:
         raise RuntimeError(
@@ -366,3 +375,27 @@ def _safe_error_message(exc: Exception) -> str:
         return message.replace(api_key, "[redacted]")
 
     return message
+
+
+def _read_error_body(exc: HTTPError) -> str:
+    try:
+        body = exc.read().decode("utf-8")
+    except Exception:
+        return "No response body."
+
+    if not body:
+        return "No response body."
+
+    return _sanitize_error_body(body)
+
+
+def _sanitize_error_body(body: str) -> str:
+    sanitized_body = body
+    qdrant_api_key = os.getenv("QDRANT_API_KEY")
+    openai_api_key = os.getenv("OPENAI_API_KEY")
+
+    for secret in (qdrant_api_key, openai_api_key):
+        if secret:
+            sanitized_body = sanitized_body.replace(secret, "[redacted]")
+
+    return sanitized_body[:500]

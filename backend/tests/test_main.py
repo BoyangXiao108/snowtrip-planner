@@ -863,6 +863,119 @@ def test_qdrant_attempted_but_error_reports_sanitized_debug(
     assert "example.cloud" in debug["qdrant_error"]
 
 
+def test_qdrant_query_uses_current_points_query_payload(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    captured_request = {}
+
+    class QueryResponse:
+        def __enter__(self) -> "QueryResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "status": "ok",
+                    "result": {
+                        "points": [
+                            {
+                                "score": 0.91,
+                                "payload": {
+                                    "resort_name": "Stowe",
+                                    "source": "resort_knowledge.json",
+                                    "text": "Stowe: terrain_notes=trees",
+                                },
+                            }
+                        ]
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(request, timeout: int) -> QueryResponse:
+        captured_request["url"] = request.full_url
+        captured_request["method"] = request.get_method()
+        captured_request["body"] = json.loads(request.data.decode("utf-8"))
+        captured_request["api_key"] = request.headers.get("Api-key")
+        return QueryResponse()
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("QDRANT_API_KEY", "test-qdrant-key")
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    results, debug = vector_store.query_resort_knowledge_with_debug(
+        "trees",
+        ["Stowe"],
+        top_k=3,
+    )
+
+    assert captured_request["url"].endswith("/collections/resort_knowledge/points/query")
+    assert captured_request["method"] == "POST"
+    assert captured_request["api_key"] == "test-qdrant-key"
+    assert captured_request["body"] == {
+        "query": [0.1, 0.2],
+        "limit": 3,
+        "with_payload": True,
+        "filter": {
+            "must": [
+                {
+                    "key": "resort_name",
+                    "match": {
+                        "any": ["Stowe"],
+                    },
+                }
+            ]
+        },
+    }
+    assert results[0]["resort_name"] == "Stowe"
+    assert debug["qdrant_result_count"] == 1
+
+
+def test_qdrant_400_response_body_is_sanitized_in_debug(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_urlopen(request, timeout: int) -> FakeQdrantResponse:
+        raise HTTPError(
+            request.full_url,
+            400,
+            "Bad Request",
+            {},
+            BytesIO(
+                b'{"status":{"error":"Bad query for secret-qdrant-key and test-openai-key"}}'
+            ),
+        )
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-openai-key")
+    monkeypatch.setenv("QDRANT_API_KEY", "secret-qdrant-key")
+    monkeypatch.setenv("QDRANT_URL", "https://example.cloud")
+    monkeypatch.setattr(
+        vector_store,
+        "_call_openai_embeddings",
+        lambda api_key, texts: [[0.1, 0.2]],
+    )
+    monkeypatch.setattr(vector_store, "urlopen", fake_urlopen)
+
+    _, debug = vector_store.query_resort_knowledge_with_debug(
+        "trees",
+        ["Stowe"],
+        top_k=3,
+    )
+
+    assert debug["qdrant_attempted"] is True
+    assert debug["qdrant_error"]
+    assert "status 400" in debug["qdrant_error"]
+    assert "Bad query" in debug["qdrant_error"]
+    assert "secret-qdrant-key" not in debug["qdrant_error"]
+    assert "test-openai-key" not in debug["qdrant_error"]
+
+
 def test_vector_store_status_works_without_qdrant_configured(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
