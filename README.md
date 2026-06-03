@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V6.9 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and lightweight local knowledge retrieval.
+Backend V7 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and local Qdrant knowledge retrieval.
 
 ## Features
 
@@ -12,7 +12,7 @@ Backend V6.9 for a simple ski resort recommendation API with weighted terrain sc
 - AI advisor summary
 - Natural-language trip parsing
 - Local resort knowledge base
-- Lightweight query-aware and embedding-based knowledge retrieval
+- Local Qdrant vector store retrieval
 - Docker
 - GitHub Actions CI
 
@@ -124,9 +124,33 @@ The backend includes a structured local knowledge file at `backend/data/resort_k
 
 Advisor summaries retrieve knowledge for the recommended resorts. `POST /advisor` uses the recommended resorts only. `POST /advisor/parse` also uses the original user message to retrieve more relevant notes.
 
-If `OPENAI_API_KEY` is set, the backend can use OpenAI embeddings to rank local resort knowledge chunks by similarity to the parsed trip message, while preferring chunks for the recommended resorts. If `OPENAI_API_KEY` is not set, it falls back to deterministic keyword retrieval for terms like trees, powder, park, groomers, budget, lodging, beginner, advanced, crowds, and long drive.
+If `OPENAI_API_KEY` is set and Qdrant is available, the backend can query the local Qdrant collection for resort knowledge chunks. If Qdrant is unavailable, it falls back to local embedding ranking. If `OPENAI_API_KEY` is not set, it falls back to deterministic keyword retrieval for terms like trees, powder, park, groomers, budget, lodging, beginner, advanced, crowds, and long drive.
 
-This retrieval is still local and lightweight. Knowledge is used only to enrich advisor explanations and does not override calculated recommendation scores. The project does not use a vector database, persistent embedding index, document upload, or scraping yet.
+Knowledge is used only to enrich advisor explanations and does not override calculated recommendation scores. Qdrant is local-only and optional; the backend does not require Qdrant for normal startup. The project does not add document upload, scraping, deployment, PostgreSQL, or user accounts.
+
+## Local Qdrant Vector Store
+
+Run the backend and Qdrant together with Docker Compose:
+
+```bash
+docker compose up --build
+```
+
+Qdrant will be available locally at `http://localhost:6333`. The backend service uses `QDRANT_URL=http://qdrant:6333` inside Compose.
+
+To build or refresh the local vector collection from `backend/data/resort_knowledge.json`, set `OPENAI_API_KEY` and call:
+
+```bash
+curl -X POST http://127.0.0.1:8000/admin/reindex-knowledge
+```
+
+If `OPENAI_API_KEY` is missing, reindexing returns a graceful `skipped` response because embeddings are required to populate Qdrant. Normal recommendation and advisor flows still work through keyword fallback.
+
+Retrieval debug mode can show one of three modes:
+
+- `qdrant`: local Qdrant vector search returned chunks.
+- `embedding`: OpenAI embeddings were available, but Qdrant did not return usable results, so local in-memory embedding ranking was used.
+- `keyword_fallback`: no OpenAI API key was available, or embedding retrieval failed.
 
 ## Weather
 

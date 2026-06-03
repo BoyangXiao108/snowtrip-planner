@@ -73,7 +73,7 @@ class RetrievedChunkDebug(BaseModel):
 
 
 class RetrievalDebug(BaseModel):
-    mode: Literal["embedding", "keyword_fallback"]
+    mode: Literal["qdrant", "embedding", "keyword_fallback"]
     query: str
     top_k: int
     retrieved_chunks: list[RetrievedChunkDebug]

@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from ai_advisor import generate_advisor_summary, parse_trip_message
 import embedding_retriever
+import vector_store
 import weather
 from resorts import find_resort_by_name, recommend_resorts
 from schemas import (
@@ -15,7 +16,7 @@ from schemas import (
 )
 
 
-app = FastAPI(title="Snowtrip Planner API", version="6.9.0")
+app = FastAPI(title="Snowtrip Planner API", version="7.0.0")
 
 app.add_middleware(
     CORSMiddleware,
@@ -75,6 +76,11 @@ def advisor_parse(request: AdvisorParseRequest) -> AdvisorParseResponse:
         advisor_summary=advisor_summary,
         retrieval_debug=retrieval_debug,
     )
+
+
+@app.post("/admin/reindex-knowledge")
+def reindex_knowledge() -> dict:
+    return vector_store.upsert_resort_knowledge()
 
 
 @app.get("/weather/{resort_name}", response_model=ResortWeatherResponse)

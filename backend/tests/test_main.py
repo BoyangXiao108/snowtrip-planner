@@ -6,6 +6,7 @@ import advisor_summary
 import embedding_retriever
 import knowledge
 import trip_parser
+import vector_store
 import weather
 from main import app
 
@@ -557,6 +558,71 @@ def test_advisor_parse_no_key_debug_reports_keyword_fallback(
     assert response.json()["retrieval_debug"]["mode"] == "keyword_fallback"
 
 
+def test_app_works_without_qdrant(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fail_if_called(query: str, resort_names: list[str], top_k: int = 3) -> list:
+        raise AssertionError("Qdrant should not be called without OPENAI_API_KEY")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(vector_store, "query_resort_knowledge", fail_if_called)
+
+    response = client.post(
+        "/advisor/parse",
+        json={
+            "message": "Epic pass from Boston for 3 days, budget $1000, trees.",
+            "debug": True,
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.json()["retrieval_debug"]["mode"] == "keyword_fallback"
+
+
+def test_admin_reindex_knowledge_handles_missing_openai_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+
+    response = client.post("/admin/reindex-knowledge")
+
+    assert response.status_code == 200
+    assert response.json()["status"] == "skipped"
+    assert "OPENAI_API_KEY is not set" in response.json()["reason"]
+
+
+def test_qdrant_query_function_can_be_mocked_without_real_qdrant(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fake_query(
+        query: str,
+        recommended_resort_names: list[str],
+        top_k: int = 3,
+    ) -> list[dict]:
+        assert query == "trees"
+        assert recommended_resort_names == ["Stowe"]
+        assert top_k == 1
+        return [
+            {
+                "resort_name": "Stowe",
+                "score": 0.88,
+                "source": "resort_knowledge.json",
+                "text": "Stowe: terrain_notes=Classic Vermont trees",
+            }
+        ]
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(vector_store, "query_resort_knowledge", fake_query)
+
+    context, debug = embedding_retriever.retrieve_embedding_context_with_debug(
+        "trees",
+        [{"name": "Stowe"}],
+        top_k=1,
+    )
+
+    assert "Classic Vermont trees" in context
+    assert debug["mode"] == "qdrant"
+    assert debug["retrieved_chunks"][0]["score"] == 0.88
+
+
 def test_advisor_parse_debug_does_not_call_openai_embeddings_without_api_key(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
@@ -700,6 +766,7 @@ def test_embedding_retrieval_uses_embedding_similarity_when_api_key_exists(
         ]
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(vector_store, "query_resort_knowledge", lambda *args: [])
     monkeypatch.setattr(embedding_retriever, "_build_searchable_chunks", lambda: chunks)
     monkeypatch.setattr(embedding_retriever, "_call_openai_embeddings", fake_embeddings)
 

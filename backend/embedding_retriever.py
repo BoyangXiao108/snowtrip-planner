@@ -4,6 +4,7 @@ import os
 from urllib.request import Request, urlopen
 
 import knowledge
+import vector_store
 
 
 OPENAI_EMBEDDINGS_URL = "https://api.openai.com/v1/embeddings"
@@ -35,6 +36,25 @@ def retrieve_embedding_context_with_debug(
             limited_recommendations,
             top_k,
         )
+
+    try:
+        qdrant_results = vector_store.query_resort_knowledge(
+            query,
+            _recommendation_display_names(recommendations),
+            top_k,
+        )
+        if qdrant_results:
+            context = "\n".join(result["text"] for result in qdrant_results)
+            debug = _build_debug_payload(
+                mode="qdrant",
+                query=query,
+                top_k=top_k,
+                chunks=[_debug_vector_result(result) for result in qdrant_results],
+            )
+
+            return context, debug
+    except Exception:
+        pass
 
     try:
         chunks = _build_searchable_chunks()
@@ -241,6 +261,17 @@ def _debug_chunk(chunk: dict, score: float | None) -> dict:
     }
 
 
+def _debug_vector_result(result: dict) -> dict:
+    score = result.get("score")
+
+    return {
+        "resort_name": result["resort_name"],
+        "score": None if score is None else round(score, 4),
+        "source": result.get("source", "resort_knowledge.json"),
+        "text_preview": _text_preview(result["text"]),
+    }
+
+
 def _text_preview(text: str, max_length: int = 180) -> str:
     if len(text) <= max_length:
         return text
@@ -250,6 +281,10 @@ def _text_preview(text: str, max_length: int = 180) -> str:
 
 def _recommendation_names(recommendations) -> set[str]:
     return {_recommendation_name(recommendation).casefold() for recommendation in recommendations}
+
+
+def _recommendation_display_names(recommendations) -> list[str]:
+    return [_recommendation_name(recommendation) for recommendation in recommendations]
 
 
 def _recommendation_name(recommendation) -> str:
