@@ -24,6 +24,13 @@ VALID_REQUEST = {
 
 
 @pytest.fixture(autouse=True)
+def clear_weather_cache() -> None:
+    weather.WEATHER_CACHE.clear()
+    yield
+    weather.WEATHER_CACHE.clear()
+
+
+@pytest.fixture(autouse=True)
 def mock_open_meteo_api(monkeypatch: pytest.MonkeyPatch) -> None:
     class FakeResponse:
         def __enter__(self) -> "FakeResponse":
@@ -218,7 +225,7 @@ def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch)
     monkeypatch.setattr(weather, "urlopen", fake_urlopen)
 
     forecast = weather.get_weather_for_resort(
-        {"latitude": 44.5293, "longitude": -72.7818}
+        {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
     )
 
     assert forecast == {
@@ -228,3 +235,124 @@ def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch)
         "snowfall_inches_today": 1.25,
         "snowfall_inches_next_3_days": 6.75,
     }
+
+
+def test_weather_first_call_fetches_external_api(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_count = 0
+
+    class CacheResponse:
+        def __enter__(self) -> "CacheResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 30.0,
+                        "wind_speed_10m": 8.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.0, 1.0, 1.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> CacheResponse:
+        nonlocal call_count
+        call_count += 1
+        return CacheResponse()
+
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+
+    forecast = weather.get_weather_for_resort(
+        {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    )
+
+    assert call_count == 1
+    assert forecast["snowfall_inches_next_3_days"] == 3.0
+
+
+def test_weather_second_call_uses_cache(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_count = 0
+
+    class CacheResponse:
+        def __enter__(self) -> "CacheResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 30.0,
+                        "wind_speed_10m": 8.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.0, 1.0, 1.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> CacheResponse:
+        nonlocal call_count
+        call_count += 1
+        return CacheResponse()
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+
+    first_forecast = weather.get_weather_for_resort(resort)
+    second_forecast = weather.get_weather_for_resort(resort)
+
+    assert call_count == 1
+    assert second_forecast == first_forecast
+
+
+def test_weather_expired_cache_refetches(monkeypatch: pytest.MonkeyPatch) -> None:
+    call_count = 0
+
+    class CacheResponse:
+        def __enter__(self) -> "CacheResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 30.0 + call_count,
+                        "wind_speed_10m": 8.0,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.0, 1.0, 1.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> CacheResponse:
+        nonlocal call_count
+        call_count += 1
+        return CacheResponse()
+
+    current_time = 1000.0
+
+    def fake_time() -> float:
+        return current_time
+
+    resort = {"name": "Stowe", "latitude": 44.5293, "longitude": -72.7818}
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+    monkeypatch.setattr(weather.time, "time", fake_time)
+
+    first_forecast = weather.get_weather_for_resort(resort)
+    current_time += weather.WEATHER_CACHE_TTL_SECONDS + 1
+    second_forecast = weather.get_weather_for_resort(resort)
+
+    assert call_count == 2
+    assert second_forecast["temperature_f"] != first_forecast["temperature_f"]

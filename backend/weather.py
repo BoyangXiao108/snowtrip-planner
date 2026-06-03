@@ -1,13 +1,39 @@
 import json
+import time
 from urllib.parse import urlencode
 from urllib.request import urlopen
 
 
 OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast"
 REQUEST_TIMEOUT_SECONDS = 5
+WEATHER_CACHE_TTL_SECONDS = 15 * 60
+WEATHER_CACHE: dict[str, dict] = {}
 
 
 def get_weather_for_resort(resort: dict) -> dict:
+    cache_key = resort["name"].casefold()
+    cached_weather = WEATHER_CACHE.get(cache_key)
+    now = time.time()
+
+    if cached_weather and cached_weather["expires_at"] > now:
+        return cached_weather["weather"]
+
+    try:
+        fresh_weather = _fetch_weather_for_resort(resort)
+    except Exception:
+        if cached_weather:
+            return cached_weather["weather"]
+        raise
+
+    WEATHER_CACHE[cache_key] = {
+        "expires_at": now + WEATHER_CACHE_TTL_SECONDS,
+        "weather": fresh_weather,
+    }
+
+    return fresh_weather
+
+
+def _fetch_weather_for_resort(resort: dict) -> dict:
     params = {
         "latitude": resort["latitude"],
         "longitude": resort["longitude"],
