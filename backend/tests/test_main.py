@@ -2,7 +2,8 @@ from fastapi.testclient import TestClient
 import json
 import pytest
 
-import ai_advisor
+import advisor_summary
+import trip_parser
 import weather
 from main import app
 
@@ -401,7 +402,7 @@ def test_advisor_does_not_call_openai_without_api_key(
         raise AssertionError("OpenAI API should not be called without OPENAI_API_KEY")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(ai_advisor, "_call_openai_advisor", fail_if_called)
+    monkeypatch.setattr(advisor_summary, "_call_openai_advisor", fail_if_called)
 
     response = client.post("/advisor", json=VALID_REQUEST)
 
@@ -488,7 +489,7 @@ def test_advisor_parse_does_not_call_openai_without_api_key(
         raise AssertionError("OpenAI parser should not be called without OPENAI_API_KEY")
 
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
-    monkeypatch.setattr(ai_advisor, "_call_openai_parser", fail_if_called)
+    monkeypatch.setattr(trip_parser, "_call_openai_parser", fail_if_called)
 
     response = client.post(
         "/advisor/parse",

@@ -4,6 +4,16 @@
 
 Backend V6.3 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, and natural-language trip parsing.
 
+## Features
+
+- Weighted terrain preferences
+- 3-day snowfall forecast
+- Snow-aware scoring
+- AI advisor summary
+- Natural-language trip parsing
+- Docker
+- GitHub Actions CI
+
 ## Project Structure
 
 ```text
