@@ -8,12 +8,20 @@ export function Metric({
   featured?: boolean;
 }) {
   return (
-    <div className={featured ? "rounded-md bg-slate-50 p-3" : undefined}>
-      <dt className="text-xs font-medium uppercase text-slate-500">{label}</dt>
+    <div
+      className={
+        featured
+          ? "rounded-xl border border-slate-100 bg-slate-50/80 p-3"
+          : undefined
+      }
+    >
+      <dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+        {label}
+      </dt>
       <dd
         className={
           featured
-            ? "mt-1 text-lg font-semibold text-slate-950"
+            ? "mt-1 text-base font-semibold text-slate-950"
             : "mt-1 text-sm font-semibold text-slate-950"
         }
       >

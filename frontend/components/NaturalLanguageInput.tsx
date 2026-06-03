@@ -9,9 +9,9 @@ export function NaturalLanguageInput({
 }) {
   return (
     <label className="block text-sm font-medium text-slate-800">
-      <span className="mb-1.5 block">Trip Request</span>
+      <span className="mb-2 block">Trip Request</span>
       <textarea
-        className="min-h-40 w-full resize-y rounded-md border border-slate-300 px-3 py-2.5 text-slate-950 outline-none ring-teal-600 focus:ring-2"
+        className="min-h-56 w-full resize-y rounded-xl border border-slate-200 bg-white px-4 py-3 text-base leading-7 text-slate-950 shadow-sm outline-none ring-teal-600 placeholder:text-slate-400 focus:ring-2"
         placeholder={DEFAULT_NATURAL_LANGUAGE_MESSAGE}
         value={value}
         onChange={(event) => onChange(event.target.value)}

@@ -9,50 +9,52 @@ export function RecommendationCard({
   rank: number;
 }) {
   return (
-    <article className="rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+    <article className="rounded-2xl border border-white/70 bg-white/90 p-5 shadow-sm shadow-slate-200/70">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-700 text-sm font-semibold text-white">
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-teal-700 text-sm font-semibold text-white shadow-sm shadow-teal-900/10">
             #{rank}
           </div>
           <div>
-            <h2 className="text-xl font-semibold text-slate-950">
+            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
               {recommendation.name}
             </h2>
-            <p className="text-sm text-slate-600">
+            <p className="mt-1 text-sm text-slate-500">
               {recommendation.state} · {recommendation.pass_type} pass
             </p>
           </div>
         </div>
-        <div className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left sm:text-right">
-          <p className="text-xs font-medium uppercase text-slate-500">Score</p>
-          <p className="text-sm font-semibold text-slate-700">
-            {recommendation.total_score.toFixed(1)}
-          </p>
-          {recommendation.snow_score !== null ? (
-            <p className="mt-1 text-xs font-medium text-sky-700">
-              Snow +{recommendation.snow_score.toFixed(1)}
-            </p>
-          ) : null}
-        </div>
       </div>
 
-      <dl className="mt-5 grid gap-3 sm:grid-cols-3">
+      <dl className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <Metric
-          label="Estimated total cost"
+          label="Score"
+          value={recommendation.total_score.toFixed(1)}
+          featured
+        />
+        <Metric
+          label="Estimated Cost"
           value={`$${recommendation.estimated_total_cost}`}
           featured
         />
-        <Metric label="Drive hours" value={`${recommendation.drive_hours}`} featured />
-        <Metric label="Pass type" value={recommendation.pass_type} featured />
+        <Metric label="Drive Hours" value={`${recommendation.drive_hours}`} featured />
+        <Metric
+          label="Snow Score"
+          value={
+            recommendation.snow_score === null
+              ? "Unavailable"
+              : recommendation.snow_score.toFixed(1)
+          }
+          featured
+        />
       </dl>
 
-      <p className="mt-4 text-sm leading-6 text-slate-700">
+      <p className="mt-4 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">
         {recommendation.reason}
       </p>
 
       {recommendation.weather ? (
-        <dl className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+        <dl className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           <Metric
             label="Temperature"
             value={formatWeather(recommendation.weather.temperature_f, "F")}

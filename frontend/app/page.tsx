@@ -25,7 +25,7 @@ import type {
 } from "../types";
 
 export default function Home() {
-  const [mode, setMode] = useState<InputMode>("structured");
+  const [mode, setMode] = useState<InputMode>("natural");
   const [origin, setOrigin] = useState("Boston");
   const [days, setDays] = useState("3");
   const [budget, setBudget] = useState("1000");
@@ -124,18 +124,22 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-6xl">
-        <header className="mb-8">
+    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#e8f3f1,transparent_36%),linear-gradient(180deg,#f8fbfb_0%,#eef4f3_100%)] px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl">
+        <header className="mx-auto mb-10 max-w-3xl text-center">
           <p className="text-sm font-semibold uppercase tracking-wide text-teal-700">
             Snowtrip Planner
           </p>
-          <h1 className="mt-2 text-3xl font-semibold text-slate-950 sm:text-4xl">
-            Find a ski trip that fits your pass, budget, and terrain.
+          <h1 className="mt-3 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+            Find the right mountain for your next ski trip.
           </h1>
+          <p className="mx-auto mt-4 max-w-2xl text-base leading-7 text-slate-600">
+            Plan a ski trip using your pass, budget, terrain preferences, weather,
+            and resort knowledge.
+          </p>
         </header>
 
-        <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
+        <section className="grid gap-6 lg:grid-cols-[minmax(360px,440px)_1fr] lg:items-start">
           <PlannerForm
             budget={budget}
             days={days}
@@ -156,7 +160,7 @@ export default function Home() {
             onTerrainWeightChange={updateTerrainWeight}
           />
 
-          <section aria-live="polite">
+          <section aria-live="polite" className="min-w-0">
             {recommendations.length === 0 && !error ? (
               <EmptyState />
             ) : null}
@@ -195,12 +199,14 @@ export default function Home() {
 
 function EmptyState() {
   return (
-    <div className="rounded-lg border border-slate-200 bg-white p-6 shadow-sm">
-      <h2 className="text-lg font-semibold text-slate-950">Ready when you are.</h2>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-slate-700">
-        Choose your pass, budget, trip length, and terrain weights, or describe
-        the trip in natural language. Snowtrip Planner will rank three resorts
-        that fit the trip you have in mind.
+    <div className="rounded-2xl border border-white/70 bg-white/80 p-8 shadow-sm shadow-slate-200/70 backdrop-blur">
+      <h2 className="text-xl font-semibold tracking-tight text-slate-950">
+        Start with one sentence.
+      </h2>
+      <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
+        Describe where you are leaving from, how long you are going, your budget,
+        your pass, and what kind of terrain you want. Your trip advice and ranked
+        recommendations will appear here.
       </p>
     </div>
   );

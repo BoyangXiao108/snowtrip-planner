@@ -18,4 +18,4 @@ export const DEFAULT_TERRAIN_WEIGHTS: TerrainWeights = {
 };
 
 export const DEFAULT_NATURAL_LANGUAGE_MESSAGE =
-  "I have Epic Pass, leaving from Boston for 3 days, budget $1000, I like trees and powder.";
+  "I have an Epic Pass, leaving from Boston for 3 days, budget $1500, and I care most about trees and powder.";
