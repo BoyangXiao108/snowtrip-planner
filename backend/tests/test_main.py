@@ -3,6 +3,7 @@ import json
 import pytest
 
 import advisor_summary
+import embedding_retriever
 import knowledge
 import trip_parser
 import weather
@@ -485,6 +486,125 @@ def test_advisor_parse_includes_query_aware_knowledge_context(
 
     assert response.status_code == 200
     assert "Useful note: lodging notes:" in advisor_summary_text
+
+
+def test_embedding_retrieval_fallback_works_without_openai_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = embedding_retriever.retrieve_embedding_context(
+        "I care about trees and lodging.",
+        recommendations,
+    )
+
+    assert "Stowe:" in context
+    assert "lodging_notes=" in context
+
+
+def test_embedding_retrieval_does_not_call_openai_without_api_key(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def fail_if_called(api_key: str, model: str, texts: list[str]) -> list[list[float]]:
+        raise AssertionError("OpenAI embeddings should not be called without API key")
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(embedding_retriever, "_call_openai_embeddings", fail_if_called)
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = embedding_retriever.retrieve_embedding_context(
+        "I care about trees.",
+        recommendations,
+    )
+
+    assert context
+
+
+def test_embedding_retrieval_includes_relevant_resort_knowledge(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = embedding_retriever.retrieve_embedding_context(
+        "I want classic Vermont trees.",
+        recommendations,
+    )
+
+    assert "Classic Vermont terrain" in context
+
+
+def test_embedding_retrieval_top_k_is_respected(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    recommendations = client.post("/recommend", json=VALID_REQUEST).json()[
+        "recommendations"
+    ]
+
+    context = embedding_retriever.retrieve_embedding_context(
+        "I want trees and powder.",
+        recommendations,
+        top_k=1,
+    )
+
+    assert len(context.splitlines()) == 1
+
+
+def test_embedding_retrieval_uses_embedding_similarity_when_api_key_exists(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    chunks = [
+        {
+            "resort_name": "Stowe",
+            "text": "Stowe tree skiing",
+            "context": "Stowe: terrain_notes=strong trees",
+        },
+        {
+            "resort_name": "Killington",
+            "text": "Killington parks",
+            "context": "Killington: terrain_notes=strong parks",
+        },
+        {
+            "resort_name": "Wildcat",
+            "text": "Wildcat rugged trees",
+            "context": "Wildcat: terrain_notes=rugged trees",
+        },
+    ]
+
+    def fake_embeddings(
+        api_key: str,
+        model: str,
+        texts: list[str],
+    ) -> list[list[float]]:
+        assert api_key == "test-key"
+        assert texts[0] == "trees"
+        return [
+            [1.0, 0.0],
+            [0.9, 0.0],
+            [0.8, 0.0],
+        ]
+
+    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(embedding_retriever, "_build_searchable_chunks", lambda: chunks)
+    monkeypatch.setattr(embedding_retriever, "_call_openai_embeddings", fake_embeddings)
+
+    context = embedding_retriever.retrieve_embedding_context(
+        "trees",
+        [{"name": "Stowe"}, {"name": "Wildcat"}],
+        top_k=2,
+    )
+    lines = context.splitlines()
+
+    assert lines[0].startswith("Stowe:")
+    assert len(lines) == 2
 
 
 def test_advisor_parse_epic_boston_days_budget_trees_powder(

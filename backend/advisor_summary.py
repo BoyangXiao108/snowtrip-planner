@@ -1,5 +1,6 @@
 import os
 
+import embedding_retriever
 import knowledge
 from openai_client import call_openai_responses
 from schemas import ResortRecommendation
@@ -52,7 +53,13 @@ def build_advisor_context(
         )
 
     recommendation_context = "\n".join(context_lines)
-    knowledge_context = knowledge.retrieve_knowledge_context(recommendations, user_message)
+    if user_message:
+        knowledge_context = embedding_retriever.retrieve_embedding_context(
+            user_message,
+            recommendations,
+        )
+    else:
+        knowledge_context = knowledge.retrieve_knowledge_context(recommendations)
 
     if not knowledge_context:
         return recommendation_context

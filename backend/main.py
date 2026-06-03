@@ -14,7 +14,7 @@ from schemas import (
 )
 
 
-app = FastAPI(title="Snowtrip Planner API", version="6.7.0")
+app = FastAPI(title="Snowtrip Planner API", version="6.8.0")
 
 app.add_middleware(
     CORSMiddleware,
