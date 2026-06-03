@@ -34,6 +34,8 @@ class WeatherForecast(BaseModel):
     temperature_f: float | None
     wind_speed_mph: float | None
     snowfall_inches: float | None
+    snowfall_inches_today: float | None
+    snowfall_inches_next_3_days: float | None
 
 
 class ResortRecommendation(BaseModel):

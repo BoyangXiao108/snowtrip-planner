@@ -2,7 +2,7 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V4 for a simple ski resort recommendation API with weighted terrain scoring and basic weather forecast support.
+Backend V5.1 for a simple ski resort recommendation API with weighted terrain scoring and 3-day snow forecast support.
 
 ## Project Structure
 
@@ -31,13 +31,30 @@ The API will run at `http://127.0.0.1:8000`.
 
 ## Weather
 
-Get a basic forecast for a resort:
+Get a 3-day forecast for a resort:
 
 ```bash
 curl http://127.0.0.1:8000/weather/Stowe
 ```
 
-Weather data comes from the Open-Meteo API and does not require an API key. If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations keep the `weather` field in the response, but it is `null` unless weather is requested through this endpoint.
+Weather data comes from the Open-Meteo API and does not require an API key. The response includes current temperature, wind speed, today's snowfall, and total snowfall for the next 3 forecast days. `snowfall_inches` remains as a backward-compatible alias for today's snowfall.
+
+Example weather response:
+
+```json
+{
+  "resort_name": "Stowe",
+  "weather": {
+    "temperature_f": 24.5,
+    "wind_speed_mph": 12.0,
+    "snowfall_inches": 3.2,
+    "snowfall_inches_today": 3.2,
+    "snowfall_inches_next_3_days": 7.7
+  }
+}
+```
+
+If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations keep the `weather` field in the response, but it is `null` unless weather is requested through this endpoint.
 
 ## Run With Docker
 

@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+import json
 import pytest
 
 import weather
@@ -22,13 +23,15 @@ VALID_REQUEST = {
 }
 
 
-@pytest.fixture(autouse=True)
+@pytest.fixture
 def mock_weather_api(monkeypatch: pytest.MonkeyPatch) -> None:
     def fake_weather_for_resort(resort: dict) -> dict:
         return {
             "temperature_f": 24.5,
             "wind_speed_mph": 12.0,
             "snowfall_inches": 3.2,
+            "snowfall_inches_today": 3.2,
+            "snowfall_inches_next_3_days": 7.7,
         }
 
     monkeypatch.setattr(weather, "get_weather_for_resort", fake_weather_for_resort)
@@ -135,7 +138,7 @@ def test_budget_zero_returns_422() -> None:
     assert response.status_code == 422
 
 
-def test_weather_returns_200_for_valid_resort() -> None:
+def test_weather_returns_200_for_valid_resort(mock_weather_api: None) -> None:
     response = client.get("/weather/Stowe")
 
     assert response.status_code == 200
@@ -145,6 +148,8 @@ def test_weather_returns_200_for_valid_resort() -> None:
             "temperature_f": 24.5,
             "wind_speed_mph": 12.0,
             "snowfall_inches": 3.2,
+            "snowfall_inches_today": 3.2,
+            "snowfall_inches_next_3_days": 7.7,
         },
     }
 
@@ -153,3 +158,43 @@ def test_weather_returns_404_for_invalid_resort() -> None:
     response = client.get("/weather/NotAResort")
 
     assert response.status_code == 404
+
+
+def test_weather_calculates_next_3_day_snowfall(monkeypatch: pytest.MonkeyPatch) -> None:
+    class FakeResponse:
+        def __enter__(self) -> "FakeResponse":
+            return self
+
+        def __exit__(self, *args: object) -> None:
+            return None
+
+        def read(self) -> bytes:
+            return json.dumps(
+                {
+                    "current": {
+                        "temperature_2m": 21.5,
+                        "wind_speed_10m": 9.2,
+                    },
+                    "daily": {
+                        "snowfall_sum": [1.25, 2.5, 3.0],
+                    },
+                }
+            ).encode("utf-8")
+
+    def fake_urlopen(url: str, timeout: int) -> FakeResponse:
+        assert "forecast_days=3" in url
+        return FakeResponse()
+
+    monkeypatch.setattr(weather, "urlopen", fake_urlopen)
+
+    forecast = weather.get_weather_for_resort(
+        {"latitude": 44.5293, "longitude": -72.7818}
+    )
+
+    assert forecast == {
+        "temperature_f": 21.5,
+        "wind_speed_mph": 9.2,
+        "snowfall_inches": 1.25,
+        "snowfall_inches_today": 1.25,
+        "snowfall_inches_next_3_days": 6.75,
+    }

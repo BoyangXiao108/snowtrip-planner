@@ -9,6 +9,8 @@ type Weather = {
   temperature_f: number | null;
   wind_speed_mph: number | null;
   snowfall_inches: number | null;
+  snowfall_inches_today: number | null;
+  snowfall_inches_next_3_days: number | null;
 };
 
 type Recommendation = {
@@ -324,20 +326,31 @@ function RecommendationCard({
       </p>
 
       {recommendation.weather ? (
-        <dl className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-3">
+        <dl className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-2 lg:grid-cols-4">
           <Metric
             label="Temperature"
             value={formatWeather(recommendation.weather.temperature_f, "F")}
             featured
           />
           <Metric
-            label="Wind speed"
+            label="Wind"
             value={formatWeather(recommendation.weather.wind_speed_mph, "mph")}
             featured
           />
           <Metric
-            label="Snowfall"
-            value={formatWeather(recommendation.weather.snowfall_inches, "in")}
+            label="Today Snow"
+            value={formatWeather(
+              recommendation.weather.snowfall_inches_today,
+              "in",
+            )}
+            featured
+          />
+          <Metric
+            label="3-Day Snow"
+            value={formatWeather(
+              recommendation.weather.snowfall_inches_next_3_days,
+              "in",
+            )}
             featured
           />
         </dl>
