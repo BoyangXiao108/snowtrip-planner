@@ -16,9 +16,16 @@ export function RecommendationCard({
             #{rank}
           </div>
           <div>
-            <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
-              {recommendation.name}
-            </h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                {recommendation.name}
+              </h2>
+              {!recommendation.in_season ? (
+                <span className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800">
+                  Likely Closed
+                </span>
+              ) : null}
+            </div>
             <p className="mt-1 text-sm text-slate-500">
               {recommendation.state} · {recommendation.pass_type} pass
             </p>
@@ -40,11 +47,7 @@ export function RecommendationCard({
         <Metric label="Drive Hours" value={`${recommendation.drive_hours}`} featured />
         <Metric
           label="Snow Score"
-          value={
-            recommendation.snow_score === null
-              ? "Unavailable"
-              : recommendation.snow_score.toFixed(1)
-          }
+          value={formatSnowScore(recommendation)}
           featured
         />
       </dl>
@@ -52,8 +55,13 @@ export function RecommendationCard({
       <p className="mt-5 flex-1 border-t border-slate-100 pt-4 text-sm leading-6 text-slate-600">
         {recommendation.reason}
       </p>
+      {!recommendation.in_season ? (
+        <p className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 p-3 text-sm leading-6 text-amber-900">
+          {recommendation.status_note}
+        </p>
+      ) : null}
 
-      {recommendation.weather ? (
+      {recommendation.weather && recommendation.in_season ? (
         <dl className="mt-5 grid gap-3 sm:grid-cols-2">
           <Metric
             label="Temperature"
@@ -89,4 +97,14 @@ export function RecommendationCard({
 
 function formatWeather(value: number | null, unit: string) {
   return value === null ? "Unavailable" : `${value} ${unit}`;
+}
+
+function formatSnowScore(recommendation: Recommendation) {
+  if (!recommendation.in_season) {
+    return "Offseason";
+  }
+
+  return recommendation.snow_score === null
+    ? "Unavailable"
+    : recommendation.snow_score.toFixed(1);
 }

@@ -47,6 +47,8 @@ class ResortRecommendation(BaseModel):
     estimated_total_cost: int
     total_score: float
     snow_score: float | None = None
+    in_season: bool
+    status_note: str
     reason: str
     weather: WeatherForecast | None = None
 

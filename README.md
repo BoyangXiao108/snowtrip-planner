@@ -2,13 +2,14 @@
 
 [![Backend CI](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml/badge.svg)](https://github.com/OWNER/REPO/actions/workflows/backend-ci.yml)
 
-Backend V7.1 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, advisor summaries, natural-language trip parsing, and local or cloud Qdrant knowledge retrieval.
+Backend V8.1 for a simple ski resort recommendation API with weighted terrain scoring, snow condition scoring, seasonal operating status, advisor summaries, natural-language trip parsing, and local or cloud Qdrant knowledge retrieval.
 
 ## Features
 
 - Weighted terrain preferences
 - 3-day snowfall forecast
 - Snow-aware scoring
+- Seasonal operating status warnings
 - AI advisor summary
 - Natural-language trip parsing
 - Local resort knowledge base
@@ -229,7 +230,7 @@ NEXT_PUBLIC_API_BASE_URL=https://your-render-service.onrender.com
 
 ## Deployment Checklist
 
-- Backend `/health` returns `{"status":"ok","version":"7.1.0"}`.
+- Backend `/health` returns `{"status":"ok","version":"8.1.0"}`.
 - Render backend has required environment variables configured.
 - Vercel frontend has `NEXT_PUBLIC_API_BASE_URL` pointing at the backend.
 - `CORS_ORIGINS` includes the deployed Vercel frontend origin.
@@ -264,6 +265,15 @@ Example weather response:
 ```
 
 If the weather request fails, the API returns `weather: null` instead of crashing. Recommendations include `snow_score` when the 3-day snowfall forecast is available.
+
+## Seasonal Operating Status
+
+Recommendations include deterministic operating-season fields:
+
+- `in_season`: whether the resort is likely within its typical lift-served ski season.
+- `status_note`: a short note with typical season guidance and a reminder to check the official resort operating page.
+
+If a resort is outside its typical season, it is still returned but marked as likely closed for lift-served skiing. Advisor summaries warn when all recommended resorts are out of season and avoid implying that the trip is currently skiable. This is approximate seasonal guidance only; Snowtrip Planner does not scrape official resort status pages yet.
 
 ## Run With Docker
 

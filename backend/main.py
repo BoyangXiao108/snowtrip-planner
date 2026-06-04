@@ -18,7 +18,7 @@ from schemas import (
 )
 
 
-APP_VERSION = "7.1.0"
+APP_VERSION = "8.1.0"
 DEFAULT_CORS_ORIGINS = [
     "http://localhost:3000",
     "http://127.0.0.1:3000",

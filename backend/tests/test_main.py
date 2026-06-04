@@ -1,4 +1,5 @@
 from fastapi.testclient import TestClient
+from datetime import date
 from io import BytesIO
 import json
 import pytest
@@ -7,6 +8,7 @@ from urllib.error import HTTPError
 import advisor_summary
 import embedding_retriever
 import knowledge
+import resorts
 import trip_parser
 import vector_store
 import weather
@@ -101,7 +103,7 @@ def test_health_returns_ok_and_version() -> None:
     response = client.get("/health")
 
     assert response.status_code == 200
-    assert response.json() == {"status": "ok", "version": "7.1.0"}
+    assert response.json() == {"status": "ok", "version": "8.1.0"}
 
 
 def test_recommend_returns_200_for_valid_weighted_terrain_request() -> None:
@@ -121,6 +123,40 @@ def test_each_recommendation_includes_total_score() -> None:
     recommendations = response.json()["recommendations"]
 
     assert all("total_score" in recommendation for recommendation in recommendations)
+
+
+def test_in_season_date_returns_true() -> None:
+    stowe = resorts.find_resort_by_name("Stowe")
+
+    assert resorts.is_resort_in_season(stowe, date(2026, 1, 15)) is True
+
+
+def test_offseason_date_returns_false() -> None:
+    stowe = resorts.find_resort_by_name("Stowe")
+
+    assert resorts.is_resort_in_season(stowe, date(2026, 7, 15)) is False
+
+
+def test_recommendation_response_includes_in_season() -> None:
+    response = client.post("/recommend", json=VALID_REQUEST)
+    recommendations = response.json()["recommendations"]
+
+    assert response.status_code == 200
+    assert all("in_season" in recommendation for recommendation in recommendations)
+    assert all("status_note" in recommendation for recommendation in recommendations)
+
+
+def test_offseason_advisor_summary_warns_user(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setattr(resorts, "date_today", lambda: date(2026, 7, 15))
+
+    response = client.post("/advisor", json=VALID_REQUEST)
+
+    assert response.status_code == 200
+    assert "not currently a skiable trip" in response.json()["advisor_summary"]
+    assert "official resort operating pages" in response.json()["advisor_summary"]
 
 
 def test_each_recommendation_includes_snow_score_when_weather_exists() -> None:
@@ -670,6 +706,7 @@ def test_openai_advisor_valid_json_formats_deterministic_summary(
         )
 
     monkeypatch.setenv("OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr(resorts, "date_today", lambda: date(2026, 1, 15))
     monkeypatch.setattr(advisor_summary, "call_openai_responses", fake_openai_response)
 
     response = client.post("/advisor", json=VALID_REQUEST)

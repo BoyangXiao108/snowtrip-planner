@@ -1,3 +1,5 @@
+from datetime import date
+
 from schemas import RecommendRequest, ResortRecommendation
 import weather
 
@@ -166,8 +168,113 @@ RESORTS = [
 ]
 
 
+OPERATING_STATUS_BY_RESORT = {
+    "Stowe": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.stowe.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from November through April; check Stowe's official operating page before booking.",
+    },
+    "Killington": {
+        "season_start_month": 11,
+        "season_end_month": 5,
+        "operating_status_url": "https://www.killington.com/the-mountain/conditions-weather/current-conditions-weather",
+        "status_note": "Killington often has one of the longest Northeast seasons, but lift-served skiing still depends on official operations.",
+    },
+    "Mount Snow": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.mountsnow.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from November through April; check Mount Snow's official operating page before booking.",
+    },
+    "Okemo": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.okemo.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from November through April; check Okemo's official operating page before booking.",
+    },
+    "Wildcat": {
+        "season_start_month": 12,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.skiwildcat.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from December through April; check Wildcat's official operating page before booking.",
+    },
+    "Attitash": {
+        "season_start_month": 12,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.attitash.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from December through April; check Attitash's official operating page before booking.",
+    },
+    "Loon": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.loonmtn.com/conditions",
+        "status_note": "Typical lift-served ski season runs from November through April; check Loon's official operating page before booking.",
+    },
+    "Sunday River": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.sundayriver.com/mountain-report",
+        "status_note": "Typical lift-served ski season runs from November through April; check Sunday River's official operating page before booking.",
+    },
+    "Sugarloaf": {
+        "season_start_month": 11,
+        "season_end_month": 5,
+        "operating_status_url": "https://www.sugarloaf.com/mountain-report",
+        "status_note": "Sugarloaf can run later than many Northeast resorts, but lift-served skiing depends on official operations.",
+    },
+    "Jay Peak": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://jaypeakresort.com/skiing-riding/snow-report-maps/snow-report",
+        "status_note": "Typical lift-served ski season runs from November through April; check Jay Peak's official operating page before booking.",
+    },
+    "Vail": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.vail.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from November through April; check Vail's official operating page before booking.",
+    },
+    "Breckenridge": {
+        "season_start_month": 11,
+        "season_end_month": 5,
+        "operating_status_url": "https://www.breckenridge.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Breckenridge often runs into May, but lift-served skiing depends on official operations.",
+    },
+    "Park City": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.parkcitymountain.com/the-mountain/mountain-conditions/terrain-and-lift-status.aspx",
+        "status_note": "Typical lift-served ski season runs from November through April; check Park City's official operating page before booking.",
+    },
+    "Snowbird": {
+        "season_start_month": 11,
+        "season_end_month": 5,
+        "operating_status_url": "https://www.snowbird.com/mountain-report/",
+        "status_note": "Snowbird can run later than many resorts, but lift-served skiing depends on official operations.",
+    },
+    "Winter Park": {
+        "season_start_month": 11,
+        "season_end_month": 5,
+        "operating_status_url": "https://www.winterparkresort.com/the-mountain/mountain-report",
+        "status_note": "Winter Park can run into spring, but lift-served skiing depends on official operations.",
+    },
+    "Steamboat": {
+        "season_start_month": 11,
+        "season_end_month": 4,
+        "operating_status_url": "https://www.steamboat.com/the-mountain/mountain-report",
+        "status_note": "Typical lift-served ski season runs from November through April; check Steamboat's official operating page before booking.",
+    },
+}
+
+
+for resort in RESORTS:
+    resort.update(OPERATING_STATUS_BY_RESORT[resort["name"]])
+
+
 RESORT_INDEX = {resort["name"].casefold(): resort for resort in RESORTS}
 WESTERN_STATES = {"Colorado", "Utah"}
+OFFSEASON_NOTE = "Likely closed for lift-served skiing based on typical season dates."
 
 
 def recommend_resorts(request: RecommendRequest) -> list[ResortRecommendation]:
@@ -185,6 +292,21 @@ def recommend_resorts(request: RecommendRequest) -> list[ResortRecommendation]:
 
 def find_resort_by_name(resort_name: str) -> dict | None:
     return RESORT_INDEX.get(resort_name.casefold())
+
+
+def is_resort_in_season(resort: dict, date: date | None = None) -> bool:
+    check_date = date or date_today()
+    start_month = resort["season_start_month"]
+    end_month = resort["season_end_month"]
+
+    if start_month <= end_month:
+        return start_month <= check_date.month <= end_month
+
+    return check_date.month >= start_month or check_date.month <= end_month
+
+
+def date_today() -> date:
+    return date.today()
 
 
 def _score_resort(resort: dict, request: RecommendRequest) -> float:
@@ -256,6 +378,7 @@ def _build_recommendation(
     total_cost = _estimate_total_cost(resort, request)
     weather_forecast = scored_resort["weather"]
     snow_score = scored_resort["snow_score"]
+    in_season = is_resort_in_season(resort)
 
     return ResortRecommendation(
         name=resort["name"],
@@ -266,7 +389,16 @@ def _build_recommendation(
         estimated_total_cost=total_cost,
         total_score=scored_resort["total_score"],
         snow_score=snow_score,
-        reason=_build_reason(resort, request, total_cost, weather_forecast, snow_score),
+        in_season=in_season,
+        status_note=_season_status_note(resort, in_season),
+        reason=_build_reason(
+            resort,
+            request,
+            total_cost,
+            weather_forecast,
+            snow_score,
+            in_season,
+        ),
         weather=weather_forecast,
     )
 
@@ -285,6 +417,7 @@ def _build_reason(
     total_cost: int,
     weather_forecast: dict | None,
     snow_score: float | None,
+    in_season: bool,
 ) -> str:
     weighted_terrain_score = _weighted_terrain_score(resort, request)
     weight_text = _terrain_weight_text(request)
@@ -303,12 +436,21 @@ def _build_reason(
 
     travel_reason = f"{resort['drive_hours']} hours from {request.origin}"
     snow_reason = _snow_reason(weather_forecast, snow_score)
+    season_reason = _season_status_note(resort, in_season)
 
     return (
         f"{pass_reason}; weighted terrain score is {weighted_terrain_score}/10 "
         f"based on {weight_text}; "
-        f"{budget_reason}; travel distance is {travel_reason}; {snow_reason}."
+        f"{budget_reason}; travel distance is {travel_reason}; {snow_reason}; "
+        f"{season_reason}."
     )
+
+
+def _season_status_note(resort: dict, in_season: bool) -> str:
+    if not in_season:
+        return OFFSEASON_NOTE
+
+    return resort["status_note"]
 
 
 def _weighted_terrain_score(resort: dict, request: RecommendRequest) -> float:

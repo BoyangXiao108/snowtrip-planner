@@ -18,6 +18,8 @@ export type Recommendation = {
   estimated_total_cost: number;
   total_score: number;
   snow_score: number | null;
+  in_season: boolean;
+  status_note: string;
   reason: string;
   weather: Weather | null;
 };

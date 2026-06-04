@@ -50,6 +50,8 @@ def build_advisor_context(
                 f"drive_hours={recommendation.drive_hours}; "
                 f"total_score={recommendation.total_score}; "
                 f"snow_score={snow_score}; "
+                f"in_season={recommendation.in_season}; "
+                f"status_note={recommendation.status_note}; "
                 f"reason={recommendation.reason}; "
                 f"weather={_weather_text(recommendation)}"
             )
@@ -113,7 +115,7 @@ def _deterministic_advisor_fields(
     return {
         "best_option": f"{best.name}.",
         "why": (
-            f"{best.name} is ranked first with score {best.total_score}, "
+            f"{_season_warning(recommendations)}{best.name} is ranked first with score {best.total_score}, "
             f"estimated total cost ${best.estimated_total_cost}, and "
             f"{best.drive_hours}-hour travel. {best.reason} {_snow_summary(best)}"
             f"{knowledge_note}"
@@ -140,6 +142,8 @@ def _call_openai_advisor(
         "The why and main_tradeoff values must each be one short complete sentence. "
         "Do not use markdown, bullet lists, tables, extra keys, or prose outside the JSON. "
         "Mention budget, terrain fit, travel distance, and snow forecast only when available. "
+        "If every recommendation has in_season=false, clearly state this is not currently "
+        "a skiable trip and advise checking official resort operating pages. "
         "Do not add facts that are not in the data.\n\n"
         f"{build_advisor_context(recommendations, user_message)}"
     )
@@ -150,11 +154,15 @@ def _call_openai_advisor(
         max_tokens=ADVISOR_MAX_OUTPUT_TOKENS,
     )
     advisor_fields = _parse_advisor_json(response_text, recommendations)
+    _apply_season_warning(advisor_fields, recommendations)
 
     return _format_advisor_summary(advisor_fields)
 
 
 def _snow_summary(recommendation: ResortRecommendation) -> str:
+    if not recommendation.in_season:
+        return "Snow score is not a reliable ski-trip signal while the resort is likely closed. "
+
     if recommendation.weather is None:
         return "Snow forecast is unavailable. "
 
@@ -164,6 +172,27 @@ def _snow_summary(recommendation: ResortRecommendation) -> str:
         return "Snow forecast is unavailable. "
 
     return f"The 3-day snow forecast is {snowfall} inches. "
+
+
+def _season_warning(recommendations: list[ResortRecommendation]) -> str:
+    if not recommendations or any(recommendation.in_season for recommendation in recommendations):
+        return ""
+
+    return (
+        "All recommended resorts are likely closed for lift-served skiing based on "
+        "typical season dates, so this is not currently a skiable trip; check official "
+        "resort operating pages before booking. "
+    )
+
+
+def _apply_season_warning(
+    advisor_fields: dict[str, str],
+    recommendations: list[ResortRecommendation],
+) -> None:
+    warning = _season_warning(recommendations)
+
+    if warning and warning not in advisor_fields["why"]:
+        advisor_fields["why"] = f"{warning}{advisor_fields['why']}"
 
 
 def _weather_text(recommendation: ResortRecommendation) -> str:
